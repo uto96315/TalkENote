@@ -136,7 +136,7 @@ TalkENote は、あなたが普段しゃべっている会話をそのまま英�
 ## よく使うコマンド
  - どのアカウントでgitにログインしているか 
 ```
-git auth status
+gh auth status
 ```
 
 ## 📄 ライセンス
