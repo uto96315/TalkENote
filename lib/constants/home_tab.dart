@@ -1,26 +1,24 @@
 import 'package:flutter/material.dart';
 
 enum HomeTab {
-  home,
-  note,
-  account,
-}
+  home(
+    name: 'ホーム',
+    page: const SizedBox(), // TODO: 後ほど正式なページに差し替え
+  ),
+  note(
+    name: '記録',
+    page: const SizedBox(),
+  ),
+  account(
+    name: 'アカウント',
+    page: const SizedBox(),
+  );
 
-final _names = {
-  HomeTab.home: "ホーム",
-  HomeTab.note: "記録",
-  HomeTab.account: "アカウント"
-};
+  const HomeTab({
+    required this.name,
+    required this.page,
+  });
 
-final _pages = {
-  HomeTab.home: const SizedBox(), // TODO: 後ほど正式なページに差し替え
-  HomeTab.note: const SizedBox(),
-  HomeTab.account: const SizedBox(),
-};
-
-final _icons = {}; // アイコンを定義
-
-extension HomeTabExt on HomeTab {
-  String get name => _names[this]!;
-  Widget get page => _pages[this]!;
+  final String name;
+  final Widget page;
 }
