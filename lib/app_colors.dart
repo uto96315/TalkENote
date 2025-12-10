@@ -1,0 +1,15 @@
+import 'package:flutter/material.dart';
+
+/// Centralized color definitions for the app.
+class AppColors {
+  const AppColors._();
+
+  static const Color primary = Color(0xFF6750A4);
+  static const Color secondary = Color(0xFF4A90E2);
+  static const Color background = Color(0xFFF5F7FB);
+  static const Color textPrimary = Color(0xFF1F2430);
+  static const Color textSecondary = Color(0xFF4B5563);
+  static const Color success = Color(0xFF22C55E);
+  static const Color warning = Color(0xFFF59E0B);
+  static const Color error = Color(0xFFEF4444);
+}
