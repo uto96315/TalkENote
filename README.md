@@ -47,10 +47,10 @@ TalkENote は、あなたが普段しゃべっている会話をそのまま英�
 - [ ] MVVM仕様でディレクトリ構成を作成
 - [ ] Firebaseのセットアップ
 - [ ] 必要なライブラリのインストール
- - [ ] 録音
- - [ ] Firebase関連
- - [ ] build-runner
- - [ ] freezed
+  - [ ] 録音
+  - [ ] Firebase関連
+  - [ ] build-runner
+  - [ ] freezed
 
 ---
 
