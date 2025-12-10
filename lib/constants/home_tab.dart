@@ -3,15 +3,15 @@ import 'package:flutter/material.dart';
 enum HomeTab {
   home(
     name: 'ホーム',
-    page: const SizedBox(), // TODO: 後ほど正式なページに差し替え
+    page: SizedBox(), // TODO: 後ほど正式なページに差し替え
   ),
   note(
     name: '記録',
-    page: const SizedBox(),
+    page: SizedBox(),
   ),
   account(
     name: 'アカウント',
-    page: const SizedBox(),
+    page: SizedBox(),
   );
 
   const HomeTab({
