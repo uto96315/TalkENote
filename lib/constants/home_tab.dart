@@ -6,8 +6,6 @@ enum HomeTab {
   account,
 }
 
-final _indexes = {HomeTab.home: 0, HomeTab.note: 1, HomeTab.account: 2};
-
 final _names = {
   HomeTab.home: "ホーム",
   HomeTab.note: "記録",
@@ -23,7 +21,6 @@ final _pages = {
 final _icons = {}; // アイコンを定義
 
 extension HomeTabExt on HomeTab {
-  int get index => _indexes[this]!;
   String get name => _names[this]!;
   Widget get page => _pages[this]!;
 }
