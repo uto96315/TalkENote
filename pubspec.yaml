@@ -11,6 +11,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  lottie: ^2.7.0
+  flutter_native_splash: ^2.3.10
 
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^2.5.1
@@ -23,6 +25,17 @@ flutter_launcher_icons:
   remove_alpha_ios: true
   adaptive_icon_background: "#61B8FF"   
   adaptive_icon_foreground: "assets/icons/app_icon.png"
+
+flutter_native_splash:
+  android: true
+  ios: true
+
+  image: assets/images/splash.png 
+  color: "#A5F6A8"
+
+  android_12:
+    image: assets/images/splash.png
+    icon_background_color: "#A5F6A8"
 
 
 dev_dependencies:
@@ -37,3 +50,4 @@ flutter:
   assets:
     - assets/icons/
     - assets/images/
+    - assets/animations/
