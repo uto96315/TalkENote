@@ -24,6 +24,54 @@
 
 ---
 
+## アーキテクチャ
+```
+lib/
+├── app/                     // MaterialApp、Route、AppLifecycle などアプリの根幹
+│   ├── routes.dart
+│   └── app.dart
+├── constants/               // 定数・固定値・アプリ設定
+│   ├── enums/               // enum（RecState, LangType など）
+│   ├── strings/             // 固定文言（i18n前提なら最小限でOK）
+│   ├── config/              // APIキー・設定値・AppConfig
+│   ├── colors.dart          // ← AppColors を置く場所
+│   └── mock/                // 開発用モックデータ
+├── data/
+│   ├── model/               // DTO（APIレスポンス、Firebaseドキュメントなど）
+│   ├── repository/          // Repository層（データ取得、Firebase, API）
+│   └── datasource/          // ローカル・リモートのDataSource
+├── domain/
+│   ├── entity/              // 純粋なビジネスEntity（会話、単語など）
+│   ├── usecase/             // ビジネスロジック（録音開始、翻訳実行など）
+│   └── converter/           // Model → Entity の変換
+├── service/                 // 外部サービス（録音、STT、翻訳、ログ）
+│   ├── audio_service.dart
+│   ├── stt_service.dart
+│   ├── translation_service.dart
+│   └── logger_service.dart
+├── ui/
+│   ├── home/                // ホーム画面（録音ボタンなど）
+│   ├── result/              // 翻訳結果表示画面
+│   ├── log/                 // 会話ログ一覧
+│   ├── vocab/               // 単語帳
+│   └── common/              // 共通UI（Button, Card, Dialog）
+├── provider/                // Riverpodの状態用（ViewModel含む）
+│   ├── home_provider.dart
+│   ├── record_provider.dart
+│   ├── stt_provider.dart
+│   ├── translation_provider.dart
+│   └── vocab_provider.dart
+├── util/                    // 汎用ユーティリティ（formatter, validator）
+├── extension/               // 拡張関数
+├── theme/                   // ThemeData、TextStyle、Padding等
+│   ├── app_theme.dart
+│   ├── typography.dart
+│   └── spacing.dart
+└── firebase_options.dart
+```
+
+---
+
 ## 🎯 プロジェクト目標
 **12/14に MVP をリリースする！**
 
