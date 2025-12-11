@@ -17,9 +17,12 @@ dependencies:
   flutter_dotenv: ^5.0.2
 
 flutter_launcher_icons:
-    android: true
-    ios: true
-    image_path: "assets/icon/icon.png"
+  android: true
+  ios: true
+  image_path: "assets/icons/app_icon.png"
+  remove_alpha_ios: true
+  adaptive_icon_background: "#61B8FF"   
+  adaptive_icon_foreground: "assets/icons/app_icon.png"
 
 
 dev_dependencies:
@@ -27,6 +30,10 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.13.1
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/images/
