@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "507538173056",
+    "project_id": "talk-e-note-firebase",
+    "storage_bucket": "talk-e-note-firebase.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:507538173056:android:3016a6f8b9bd5a637eca65",
+        "android_client_info": {
+          "package_name": "com.yutomabe.talkenote"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB0w5ExavWNB828iRNEIDCPnqR2VtPG8PI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
