@@ -15,6 +15,16 @@ class HomeTabPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen(homeViewModelProvider, (prev, next) {
+      final msg = next.errorMessage;
+      if (msg != null && msg.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(msg)),
+        );
+        ref.read(homeViewModelProvider.notifier).clearError();
+      }
+    });
+
     final state = ref.watch(homeViewModelProvider);
     final vm = ref.read(homeViewModelProvider.notifier);
     final isRecording = state.isRecording;
@@ -27,31 +37,31 @@ class HomeTabPage extends ConsumerWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppColors.gradientTop,
-            AppColors.primary.withValues(alpha: 0.9),
+            const Color.fromARGB(255, 177, 245, 179),
+            AppColors.primary.withValues(alpha: 0.6),
           ],
         ),
       ),
       child: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 16),
+            const SizedBox(height: 60),
             Text(
               'TalkENote',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
+              style: TextStyle(
+                  fontSize: 44,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 20),
             Text(
               isRecording ? 'レコーディング中' : 'ボタンをタップで録音開始',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
+              style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 50),
             _RecordButton(
               isRecording: isRecording,
               onTap: () => vm.toggleRecording(),
@@ -64,7 +74,7 @@ class HomeTabPage extends ConsumerWidget {
                     fontWeight: FontWeight.w600,
                   ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 10),
             Text(
               isRecording ? 'Auto stop at 01:00' : 'Auto stop after 01:00',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
