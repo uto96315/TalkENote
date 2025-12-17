@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -53,6 +54,8 @@ final homeViewModelProvider =
 class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   HomeViewModel() : super();
 
+  static const _maxRecordingDuration = Duration(minutes: 1);
+
   final _audioRepo = AudioFileRepository();
   final _recordService = RecordAudioService();
   late final RecordingRepository _recordingRepo;
@@ -61,6 +64,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   late final SentenceSplitterService _splitter;
   late final TranslationSuggestionService _translator;
   bool _isLoadingFiles = false;
+  Timer? _autoStopTimer;
 
   @override
   HomeState build() {
@@ -69,23 +73,44 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     _transcription = ref.read(transcriptionServiceProvider);
     _splitter = ref.read(sentenceSplitterServiceProvider);
     _translator = ref.read(translationSuggestionServiceProvider);
+    ref.onDispose(() => _autoStopTimer?.cancel());
     Future.microtask(_loadFiles); // 非同期に初回ロードを開始
     return const HomeState(isLoading: true);
   }
 
   Future<void> toggleRecording() async {
     if (state.isRecording) {
-      final path = await _recordService.stop();
-      state = state.copyWith(isRecording: false);
-      if (path != null) {
-        await _loadFiles();
-        await _uploadRecording(path);
-      }
+      await _stopRecording();
       return;
     }
 
     await _recordService.start();
     state = state.copyWith(isRecording: true);
+    _scheduleAutoStop();
+  }
+
+  Future<void> _stopRecording() async {
+    if (!state.isRecording) return;
+    _autoStopTimer?.cancel();
+    _autoStopTimer = null;
+    String? path;
+    try {
+      path = await _recordService.stop();
+    } catch (e, s) {
+      debugPrint('Failed to stop recording: $e $s');
+    }
+    state = state.copyWith(isRecording: false);
+    if (path != null) {
+      await _loadFiles();
+      await _uploadRecording(path);
+    }
+  }
+
+  void _scheduleAutoStop() {
+    _autoStopTimer?.cancel();
+    _autoStopTimer = Timer(_maxRecordingDuration, () {
+      _stopRecording();
+    });
   }
 
   Future<void> _loadFiles() async {
