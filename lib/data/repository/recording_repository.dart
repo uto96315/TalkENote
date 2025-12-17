@@ -6,7 +6,9 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../constants/recording_fields.dart';
 import '../../constants/upload_status.dart';
+import '../../constants/transcript_status.dart';
 import '../model/recording.dart';
+import '../model/sentence.dart';
 
 class RecordingRepository {
   RecordingRepository(this._firestore, this._storage);
@@ -53,7 +55,6 @@ class RecordingRepository {
   Future<void> saveMetadata({
     required String recordingId,
     required String userId,
-    required String storagePath,
     required double durationSec,
     String? memo,
     String? title,
@@ -63,7 +64,7 @@ class RecordingRepository {
     final recording = Recording(
       id: recordingId,
       userId: userId,
-      storagePath: storagePath,
+      storagePath: '',
       durationSec: durationSec,
       uploadStatus: status,
       memo: memo,
@@ -84,7 +85,7 @@ class RecordingRepository {
     await _collection.doc(recordingId).set(
           Recording.statusUpdate(
             status: status,
-            newStoragePath: storagePath,
+            newStoragePath: null,
           ),
           SetOptions(merge: true),
         );
@@ -126,5 +127,41 @@ class RecordingRepository {
           payload,
           SetOptions(merge: true),
         );
+  }
+
+  Future<void> updateTranscriptRaw({
+    required String recordingId,
+    required String transcriptRaw,
+  }) async {
+    await _collection.doc(recordingId).set(
+      {
+        RecordingFields.transcriptRaw: transcriptRaw,
+        RecordingFields.transcriptStatus: TranscriptStatus.done.value,
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<void> updateTranscriptStatus({
+    required String recordingId,
+    required TranscriptStatus status,
+  }) async {
+    await _collection.doc(recordingId).set(
+      {RecordingFields.transcriptStatus: status.value},
+      SetOptions(merge: true),
+    );
+  }
+
+  Future<void> updateSentences({
+    required String recordingId,
+    required List<Sentence> sentences,
+  }) async {
+    await _collection.doc(recordingId).set(
+      {
+        RecordingFields.sentences:
+            sentences.map((s) => s.toMap()).toList(growable: false),
+      },
+      SetOptions(merge: true),
+    );
   }
 }
