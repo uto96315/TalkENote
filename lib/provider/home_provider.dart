@@ -28,24 +28,28 @@ class HomeState {
     this.isRecording = false,
     this.isLoading = false,
     this.recordingElapsed = Duration.zero,
+    this.errorMessage,
   });
 
   final List<FileSystemEntity> files;
   final bool isRecording;
   final bool isLoading;
   final Duration recordingElapsed;
+  final String? errorMessage;
 
   HomeState copyWith({
     List<FileSystemEntity>? files,
     bool? isRecording,
     bool? isLoading,
     Duration? recordingElapsed,
+    String? errorMessage,
   }) {
     return HomeState(
       files: files ?? this.files,
       isRecording: isRecording ?? this.isRecording,
       isLoading: isLoading ?? this.isLoading,
       recordingElapsed: recordingElapsed ?? this.recordingElapsed,
+      errorMessage: errorMessage,
     );
   }
 }
@@ -98,6 +102,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     state = state.copyWith(
       isRecording: true,
       recordingElapsed: Duration.zero,
+      errorMessage: null,
     );
     _scheduleAutoStop();
     _startElapsedTicker();
@@ -116,9 +121,27 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     } catch (e, s) {
       debugPrint('Failed to stop recording: $e $s');
     }
+
+    Duration? duration;
+    if (path != null) {
+      duration = await _measureDuration(path);
+      if (duration != null && duration < const Duration(seconds: 5)) {
+        state = state.copyWith(
+          isRecording: false,
+          recordingElapsed: Duration.zero,
+          errorMessage: '5秒未満の録音は保存できません',
+        );
+        try {
+          await File(path).delete();
+        } catch (_) {}
+        return;
+      }
+    }
+
     state = state.copyWith(
       isRecording: false,
       recordingElapsed: Duration.zero,
+      errorMessage: null,
     );
     if (path != null) {
       await _loadFiles();
@@ -233,6 +256,16 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       debugPrint('Failed to delete local recordings: $e $s');
     } finally {
       state = state.copyWith(isLoading: false);
+    }
+  }
+
+  Future<void> refreshFiles() async {
+    await _loadFiles();
+  }
+
+  void clearError() {
+    if (state.errorMessage != null) {
+      state = state.copyWith(errorMessage: null);
     }
   }
 
