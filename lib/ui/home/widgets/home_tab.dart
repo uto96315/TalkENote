@@ -36,12 +36,8 @@ class HomeTabPage extends ConsumerWidget {
                 itemBuilder: (_, i) {
                   final file = state.files[i];
                   final name = file.path.split('/').last;
-                  final isPlaying = state.playingPath == file.path;
-
                   return ListTile(
-                    leading: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
                     title: Text(name),
-                    onTap: () => vm.togglePlay(file.path),
                   );
                 },
               ),

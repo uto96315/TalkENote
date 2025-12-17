@@ -8,6 +8,7 @@ import '../../constants/upload_status.dart';
 import '../../data/model/recording.dart';
 import '../../data/model/sentence.dart';
 import '../../provider/ai_provider.dart';
+import '../../service/ai/translation_suggestion_service.dart';
 import '../../provider/recording_provider.dart';
 import '../../constants/transcript_status.dart';
 
@@ -27,6 +28,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
   late Recording _recording;
   bool _saving = false;
   bool _splitting = false;
+  bool _translating = false;
 
   @override
   void initState() {
@@ -113,8 +115,6 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
               _row('ステータス', recording.uploadStatus.value),
               const SizedBox(height: 8),
               _row('長さ (sec)', recording.durationSec.toStringAsFixed(2)),
-              const SizedBox(height: 8),
-              _row('ストレージパス', recording.storagePath),
               const SizedBox(height: 12),
               TextField(
                 controller: _memoCtrl,
@@ -160,13 +160,13 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
                           )
                         : const Icon(Icons.translate),
                     label: const Text('文字起こしする'),
-                    onPressed: () {
-                      debugPrint("tapped");
-                      _recording.transcriptStatus ==
-                              TranscriptStatus.transcribing
-                          ? null
-                          : _onTranscribe();
-                    },
+                    onPressed: _recording.transcriptStatus ==
+                            TranscriptStatus.transcribing
+                        ? null
+                        : () {
+                            debugPrint("tapped");
+                            _onTranscribe();
+                          },
                   ),
                   ElevatedButton.icon(
                     icon: _splitting
@@ -178,6 +178,17 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
                         : const Icon(Icons.format_list_bulleted),
                     label: const Text('文に分割'),
                     onPressed: _splitting ? null : _onSplitSentences,
+                  ),
+                  ElevatedButton.icon(
+                    icon: _translating
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.g_translate),
+                    label: const Text('翻訳候補を生成'),
+                    onPressed: _translating ? null : _onGenerateTranslations,
                   ),
                 ],
               ),
@@ -333,33 +344,38 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
     final scaffold = ScaffoldMessenger.of(context);
     final repo = ref.read(recordingRepositoryProvider);
     final ctrl = TextEditingController(text: sentence.text);
-    final updatedText = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('文を編集'),
-          content: TextField(
-            controller: ctrl,
-            minLines: 1,
-            maxLines: 4,
-            autofocus: true,
-            decoration: const InputDecoration(
-              border: OutlineInputBorder(),
+    String? updatedText;
+    try {
+      updatedText = await showDialog<String>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('文を編集'),
+            content: TextField(
+              controller: ctrl,
+              minLines: 1,
+              maxLines: 4,
+              autofocus: true,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+              ),
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('キャンセル'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
-              child: const Text('保存'),
-            ),
-          ],
-        );
-      },
-    );
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('キャンセル'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
+                child: const Text('保存'),
+              ),
+            ],
+          );
+        },
+      );
+    } finally {
+      ctrl.dispose();
+    }
     if (updatedText == null) return;
     if (updatedText.isEmpty) {
       scaffold.showSnackBar(
@@ -388,6 +404,69 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
       scaffold.showSnackBar(
         SnackBar(content: Text('更新に失敗しました: $e')),
       );
+    }
+  }
+
+  Future<void> _onGenerateTranslations() async {
+    final scaffold = ScaffoldMessenger.of(context);
+    final translator = ref.read(translationSuggestionServiceProvider);
+    final repo = ref.read(recordingRepositoryProvider);
+
+    if (!translator.isConfigured) {
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('OpenAI APIキーが設定されていません (.env)')),
+      );
+      return;
+    }
+    if (_recording.sentences.isEmpty) {
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('先に文分割を実行してください')),
+      );
+      return;
+    }
+
+    setState(() => _translating = true);
+    try {
+      final updated = <Sentence>[];
+      for (final s in _recording.sentences) {
+        final res = await translator.generateSuggestions(
+          s.text,
+          genreHint: s.genre,
+          allowedSegments: kAllowedSegments,
+        );
+        final selectedSentences = res.selected.isNotEmpty
+            ? res.selected
+            : res.suggestions
+                .map((m) => m['en'])
+                .whereType<String>()
+                .where((e) => e.isNotEmpty)
+                .toList();
+        updated.add(
+          s.copyWith(
+            ja: res.ja,
+            suggestions: res.suggestions,
+            selected: selectedSentences,
+            genre: res.genre ?? s.genre,
+            segment: res.segment ?? s.segment,
+          ),
+        );
+      }
+      await repo.updateSentences(
+        recordingId: _recording.id,
+        sentences: updated,
+      );
+      setState(() {
+        _recording = _recording.copyWith(sentences: updated);
+      });
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('翻訳候補を生成しました')),
+      );
+    } catch (e) {
+      scaffold.showSnackBar(
+        SnackBar(content: Text('翻訳候補の生成に失敗しました: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _translating = false);
     }
   }
 }
@@ -472,9 +551,58 @@ class _SentencesSection extends StatelessWidget {
                   final s = sentences[i];
                   return ListTile(
                     title: Text(s.text),
-                    trailing: IconButton(
-                      icon: const Icon(Icons.edit_outlined),
-                      onPressed: () => onEdit(s),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if ((s.ja ?? '').isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              s.ja!,
+                              style: const TextStyle(color: Colors.black87),
+                            ),
+                          ),
+                        if (s.suggestions.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Wrap(
+                              spacing: 6,
+                              runSpacing: 4,
+                              children: s.suggestions.map((suggestion) {
+                                final sentence = suggestion['en'] ?? '';
+                                final desc = suggestion['desc'] ?? '';
+                                final isSelected =
+                                    s.selected.contains(sentence);
+                                return Chip(
+                                  label: Text(
+                                    desc.isEmpty
+                                        ? sentence
+                                        : '$sentence ($desc)',
+                                  ),
+                                  backgroundColor:
+                                      isSelected ? Colors.blue.shade50 : null,
+                                );
+                              }).toList(),
+                            ),
+                          ),
+                        if ((s.genre ?? '').isNotEmpty ||
+                            (s.segment ?? '').isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              [
+                                if ((s.genre ?? '').isNotEmpty)
+                                  'genre: ${s.genre}',
+                                if ((s.segment ?? '').isNotEmpty)
+                                  'segment: ${s.segment}',
+                              ].join(' / '),
+                              style: TextStyle(
+                                color: Colors.grey.shade700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   );
                 },

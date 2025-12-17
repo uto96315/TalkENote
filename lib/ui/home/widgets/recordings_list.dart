@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
-
-import '../../../constants/upload_status.dart';
 import '../../../data/model/recording.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/recording_provider.dart';
@@ -16,8 +13,6 @@ class RecordingsList extends ConsumerStatefulWidget {
 }
 
 class _RecordingsListState extends ConsumerState<RecordingsList> {
-  late final AudioPlayer _player;
-  String? _playingId;
   bool _isLoading = false;
   List<Recording> _items = [];
   String? _error;
@@ -25,7 +20,6 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
   @override
   void initState() {
     super.initState();
-    _player = AudioPlayer();
     _load();
   }
 
@@ -58,42 +52,8 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
     }
   }
 
-  Future<void> _play(Recording rec) async {
-    final repo = ref.read(recordingRepositoryProvider);
-    try {
-      final url = await repo.downloadUrl(rec.storagePath);
-      await _player.setUrl(url);
-      await _player.play();
-      setState(() => _playingId = rec.id);
-    } catch (e) {
-      setState(() => _error = '再生できませんでした: $e');
-    }
-  }
-
-  Future<void> _reupload(Recording rec) async {
-    final repo = ref.read(recordingRepositoryProvider);
-    setState(() => _isLoading = true);
-    try {
-      final exists = await repo.existsInStorage(rec.storagePath);
-      if (!exists) {
-        setState(() => _error = '元ファイルが見つかりませんでした');
-      } else {
-        await repo.reuploadFromStorage(
-          recordingId: rec.id,
-          storagePath: rec.storagePath,
-        );
-        await _load();
-      }
-    } catch (e) {
-      setState(() => _error = '再アップロードに失敗しました: $e');
-    } finally {
-      setState(() => _isLoading = false);
-    }
-  }
-
   @override
   void dispose() {
-    _player.dispose();
     super.dispose();
   }
 
@@ -132,46 +92,10 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
                     final dateLabel = created != null
                         ? '${created.year}/${created.month.toString().padLeft(2, '0')}/${created.day.toString().padLeft(2, '0')} ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}'
                         : '';
-                    final isPlaying = _playingId == rec.id;
-                    final isPending = rec.uploadStatus == UploadStatus.pending;
                     return Card(
                       child: ListTile(
                         title: Text(rec.title ?? '(タイトルなし)'),
                         subtitle: Text(dateLabel),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if ((rec.memo ?? '').isNotEmpty)
-                              const Padding(
-                                padding: EdgeInsets.only(right: 8),
-                                child: Icon(
-                                  Icons.sticky_note_2_outlined,
-                                  size: 20,
-                                ),
-                              ),
-                            if (isPending)
-                              TextButton(
-                                onPressed:
-                                    _isLoading ? null : () => _reupload(rec),
-                                child: const Text('再アップロード'),
-                              ),
-                            IconButton(
-                              icon: Icon(
-                                isPlaying
-                                    ? Icons.stop_circle_outlined
-                                    : Icons.play_arrow,
-                              ),
-                              onPressed: () async {
-                                if (isPlaying) {
-                                  await _player.stop();
-                                  setState(() => _playingId = null);
-                                } else {
-                                  await _play(rec);
-                                }
-                              },
-                            ),
-                          ],
-                        ),
                         onTap: () async {
                           await Navigator.of(context).push(
                             MaterialPageRoute(

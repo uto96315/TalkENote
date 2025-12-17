@@ -1,40 +1,45 @@
 import 'dart:io';
+import 'dart:typed_data';
+
+// ignore_for_file: avoid_print
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
+import '../constants/transcript_status.dart';
 import '../service/audio/audio_file_repository.dart';
 import '../service/audio/record_audio_service.dart';
+import '../service/ai/transcription_service.dart';
+import '../service/ai/sentence_splitter_service.dart';
+import '../service/ai/translation_suggestion_service.dart';
 import '../data/repository/recording_repository.dart';
 import '../data/repository/auth_repository.dart';
+import '../provider/ai_provider.dart';
 import '../provider/auth_provider.dart';
 import '../provider/recording_provider.dart';
 import '../constants/upload_status.dart';
+import '../data/model/sentence.dart';
 
 class HomeState {
   const HomeState({
     this.files = const [],
     this.isRecording = false,
-    this.playingPath,
     this.isLoading = false,
   });
 
   final List<FileSystemEntity> files;
   final bool isRecording;
-  final String? playingPath;
   final bool isLoading;
 
   HomeState copyWith({
     List<FileSystemEntity>? files,
     bool? isRecording,
-    String? playingPath,
     bool? isLoading,
   }) {
     return HomeState(
       files: files ?? this.files,
       isRecording: isRecording ?? this.isRecording,
-      playingPath: playingPath ?? this.playingPath,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -52,15 +57,18 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   final _recordService = RecordAudioService();
   late final RecordingRepository _recordingRepo;
   late final AuthRepository _authRepo;
-  late final AudioPlayer _player;
+  late final TranscriptionService _transcription;
+  late final SentenceSplitterService _splitter;
+  late final TranslationSuggestionService _translator;
   bool _isLoadingFiles = false;
 
   @override
   HomeState build() {
     _recordingRepo = ref.read(recordingRepositoryProvider);
     _authRepo = ref.read(authRepositoryProvider);
-    _player = AudioPlayer();
-    ref.onDispose(_player.dispose);
+    _transcription = ref.read(transcriptionServiceProvider);
+    _splitter = ref.read(sentenceSplitterServiceProvider);
+    _translator = ref.read(translationSuggestionServiceProvider);
     Future.microtask(_loadFiles); // 非同期に初回ロードを開始
     return const HomeState(isLoading: true);
   }
@@ -68,7 +76,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   Future<void> toggleRecording() async {
     if (state.isRecording) {
       final path = await _recordService.stop();
-      state = state.copyWith(isRecording: false, playingPath: null);
+      state = state.copyWith(isRecording: false);
       if (path != null) {
         await _loadFiles();
         await _uploadRecording(path);
@@ -78,18 +86,6 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
 
     await _recordService.start();
     state = state.copyWith(isRecording: true);
-  }
-
-  Future<void> togglePlay(String path) async {
-    if (state.playingPath == path) {
-      await _player.stop();
-      state = state.copyWith(playingPath: null);
-      return;
-    }
-
-    await _player.setFilePath(path);
-    await _player.play();
-    state = state.copyWith(playingPath: path);
   }
 
   Future<void> _loadFiles() async {
@@ -116,8 +112,6 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
 
     state = state.copyWith(isLoading: true);
     final recordingId = _recordingRepo.newRecordingId();
-    final plannedStoragePath = 'recordings/${user.uid}/$recordingId.m4a';
-    var metadataSaved = false;
     try {
       final duration = await _measureDuration(path);
       final now = DateTime.now();
@@ -126,42 +120,35 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       await _recordingRepo.saveMetadata(
         recordingId: recordingId,
         userId: user.uid,
-        storagePath: plannedStoragePath,
         durationSec: duration == null ? 0 : duration.inMilliseconds / 1000.0,
         memo: '',
         title: defaultTitle,
         newWords: const [],
-        status: UploadStatus.pending,
-      );
-      metadataSaved = true;
-
-      final storagePath = await _recordingRepo.uploadRecording(
-        userId: user.uid,
-        recordingId: recordingId,
-        file: File(path),
-      );
-      await _recordingRepo.updateStatus(
-        recordingId: recordingId,
         status: UploadStatus.uploaded,
-        storagePath: storagePath,
+      );
+
+      // 音声バイトを渡して同期的にパイプラインを実行
+      final Uint8List bytes = await File(path).readAsBytes();
+      final fileName = path.split('/').last;
+      await _runTranscriptionPipeline(
+        recordingId: recordingId,
+        bytes: bytes,
+        fileName: fileName,
       );
 
       try {
-        await File(path).delete(); // アップロード成功後はローカルを削除
+        await File(path).delete(); // 音声処理後はローカルを削除
       } catch (e) {
         debugPrint('Failed to delete local file: $e');
       }
     } catch (e, s) {
-      debugPrint('Failed to upload recording: $e $s');
-      // saveMetadataが成功している場合のみステータス更新を試みる
-      if (metadataSaved) {
-        try {
-          await _recordingRepo.updateStatus(
-            recordingId: recordingId,
-            status: UploadStatus.failed,
-          );
-        } catch (_) {}
-      }
+      debugPrint('Failed to process recording: $e $s');
+      try {
+        await _recordingRepo.updateStatus(
+          recordingId: recordingId,
+          status: UploadStatus.failed,
+        );
+      } catch (_) {}
     } finally {
       state = state.copyWith(isLoading: false);
     }
@@ -183,7 +170,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   }
 
   Future<void> deleteLocalRecordings() async {
-    state = state.copyWith(isLoading: true, playingPath: null);
+    state = state.copyWith(isLoading: true);
     try {
       await _audioRepo.deleteAllRecordings();
       await _loadFiles();
@@ -191,6 +178,99 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       debugPrint('Failed to delete local recordings: $e $s');
     } finally {
       state = state.copyWith(isLoading: false);
+    }
+  }
+
+  Future<void> _runTranscriptionPipeline({
+    required String recordingId,
+    required Uint8List bytes,
+    required String fileName,
+  }) async {
+    // If API key is not configured, skip silently (manual button remains)
+    if (!_transcription.isConfigured || !_splitter.isConfigured) {
+      debugPrint('Transcription pipeline skipped: API key not configured');
+      return;
+    }
+
+    print('Pipeline: start recordingId=$recordingId');
+    List<Sentence> sentences = const [];
+    try {
+      await _recordingRepo.updateTranscriptStatus(
+        recordingId: recordingId,
+        status: TranscriptStatus.transcribing,
+      );
+      print('Pipeline: status -> transcribing');
+
+      print('Pipeline: read local file $fileName (${bytes.length} bytes)');
+      final text = await _transcription.transcribeFromBytes(
+        bytes,
+        fileName: fileName,
+      );
+      print('Pipeline: transcription done, length=${text.length}');
+
+      await _recordingRepo.updateTranscriptRaw(
+        recordingId: recordingId,
+        transcriptRaw: text,
+      );
+      print('Pipeline: transcriptRaw saved (status -> done via repo)');
+
+      final sentencesText = await _splitter.splitSentences(text);
+      sentences =
+          sentencesText.map((t) => Sentence.withGeneratedId(t)).toList();
+      await _recordingRepo.updateSentences(
+        recordingId: recordingId,
+        sentences: sentences,
+      );
+      print('Pipeline: sentences saved count=${sentences.length}');
+    } catch (e, s) {
+      debugPrint('Transcription pipeline failed: $e $s');
+      try {
+        await _recordingRepo.updateTranscriptStatus(
+          recordingId: recordingId,
+          status: TranscriptStatus.failed,
+        );
+      } catch (_) {}
+      return;
+    }
+
+    if (!_translator.isConfigured) {
+      print('Pipeline: translator not configured, skip translation');
+      return;
+    }
+
+    try {
+      final translated = <Sentence>[];
+      for (final s in sentences) {
+        final res = await _translator.generateSuggestions(
+          s.text,
+          genreHint: s.genre,
+          allowedSegments: kAllowedSegments,
+        );
+        final selectedSentences = res.selected.isNotEmpty
+            ? res.selected
+            : res.suggestions
+                .map((m) => m['en'])
+                .whereType<String>()
+                .where((e) => e.isNotEmpty)
+                .toList();
+        translated.add(
+          s.copyWith(
+            ja: res.ja,
+            suggestions: res.suggestions,
+            selected: selectedSentences,
+            genre: res.genre ?? s.genre,
+            segment: res.segment ?? s.segment,
+          ),
+        );
+      }
+      await _recordingRepo.updateSentences(
+        recordingId: recordingId,
+        sentences: translated,
+      );
+      print(
+          'Pipeline: translation suggestions saved count=${translated.length}');
+    } catch (e, s) {
+      debugPrint('Translation phase failed (skipped): $e $s');
     }
   }
 }
