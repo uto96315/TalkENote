@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:talkenote/constants/app_colors.dart';
 import '../../../data/model/recording.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/recording_provider.dart';
@@ -16,10 +17,18 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
   bool _isLoading = false;
   List<Recording> _items = [];
   String? _error;
+  ProviderSubscription<int>? _reloadSub;
 
   @override
   void initState() {
     super.initState();
+    // Listen for external reload requests (e.g., when switching to this tab)
+    _reloadSub = ref.listenManual<int>(
+      recordingsReloadTickProvider,
+      (previous, next) {
+        _load();
+      },
+    );
     _load();
   }
 
@@ -54,6 +63,7 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
 
   @override
   void dispose() {
+    _reloadSub?.close();
     super.dispose();
   }
 
@@ -78,9 +88,19 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
                 ),
               ),
             if (!_isLoading && _items.isEmpty && _error == null)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text('まだ記録がありません'),
+              Expanded(
+                child: Center(
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 24),
+                    child: Text(
+                      'まだ記録がありません',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 16,
+                          color: AppColors.textSecondary),
+                    ),
+                  ),
+                ),
               ),
             if (_items.isNotEmpty)
               Expanded(
@@ -116,4 +136,3 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
     );
   }
 }
-

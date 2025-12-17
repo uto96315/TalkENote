@@ -27,21 +27,29 @@ class HomeState {
     this.files = const [],
     this.isRecording = false,
     this.isLoading = false,
+    this.recordingElapsed = Duration.zero,
+    this.errorMessage,
   });
 
   final List<FileSystemEntity> files;
   final bool isRecording;
   final bool isLoading;
+  final Duration recordingElapsed;
+  final String? errorMessage;
 
   HomeState copyWith({
     List<FileSystemEntity>? files,
     bool? isRecording,
     bool? isLoading,
+    Duration? recordingElapsed,
+    String? errorMessage,
   }) {
     return HomeState(
       files: files ?? this.files,
       isRecording: isRecording ?? this.isRecording,
       isLoading: isLoading ?? this.isLoading,
+      recordingElapsed: recordingElapsed ?? this.recordingElapsed,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }
@@ -65,6 +73,8 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   late final TranslationSuggestionService _translator;
   bool _isLoadingFiles = false;
   Timer? _autoStopTimer;
+  Timer? _elapsedTimer;
+  DateTime? _recordingStartedAt;
 
   @override
   HomeState build() {
@@ -73,7 +83,10 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     _transcription = ref.read(transcriptionServiceProvider);
     _splitter = ref.read(sentenceSplitterServiceProvider);
     _translator = ref.read(translationSuggestionServiceProvider);
-    ref.onDispose(() => _autoStopTimer?.cancel());
+    ref.onDispose(() {
+      _autoStopTimer?.cancel();
+      _elapsedTimer?.cancel();
+    });
     Future.microtask(_loadFiles); // 非同期に初回ロードを開始
     return const HomeState(isLoading: true);
   }
@@ -85,21 +98,51 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     }
 
     await _recordService.start();
-    state = state.copyWith(isRecording: true);
+    _recordingStartedAt = DateTime.now();
+    state = state.copyWith(
+      isRecording: true,
+      recordingElapsed: Duration.zero,
+      errorMessage: null,
+    );
     _scheduleAutoStop();
+    _startElapsedTicker();
   }
 
   Future<void> _stopRecording() async {
     if (!state.isRecording) return;
     _autoStopTimer?.cancel();
     _autoStopTimer = null;
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+    _recordingStartedAt = null;
     String? path;
     try {
       path = await _recordService.stop();
     } catch (e, s) {
       debugPrint('Failed to stop recording: $e $s');
     }
-    state = state.copyWith(isRecording: false);
+
+    Duration? duration;
+    if (path != null) {
+      duration = await _measureDuration(path);
+      if (duration != null && duration < const Duration(seconds: 5)) {
+        state = state.copyWith(
+          isRecording: false,
+          recordingElapsed: Duration.zero,
+          errorMessage: '5秒未満の録音は保存できません',
+        );
+        try {
+          await File(path).delete();
+        } catch (_) {}
+        return;
+      }
+    }
+
+    state = state.copyWith(
+      isRecording: false,
+      recordingElapsed: Duration.zero,
+      errorMessage: null,
+    );
     if (path != null) {
       await _loadFiles();
       await _uploadRecording(path);
@@ -110,6 +153,16 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     _autoStopTimer?.cancel();
     _autoStopTimer = Timer(_maxRecordingDuration, () {
       _stopRecording();
+    });
+  }
+
+  void _startElapsedTicker() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final started = _recordingStartedAt;
+      if (!state.isRecording || started == null) return;
+      final elapsed = DateTime.now().difference(started);
+      state = state.copyWith(recordingElapsed: elapsed);
     });
   }
 
@@ -203,6 +256,16 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       debugPrint('Failed to delete local recordings: $e $s');
     } finally {
       state = state.copyWith(isLoading: false);
+    }
+  }
+
+  Future<void> refreshFiles() async {
+    await _loadFiles();
+  }
+
+  void clearError() {
+    if (state.errorMessage != null) {
+      state = state.copyWith(errorMessage: null);
     }
   }
 
