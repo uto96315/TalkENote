@@ -53,6 +53,11 @@ class _HomeTabPage extends ConsumerWidget {
             onPressed: () => vm.toggleRecording(),
             child: Text(state.isRecording ? 'Stop' : 'Record'),
           ),
+          TextButton(
+            onPressed:
+                state.isLoading ? null : () => vm.deleteLocalRecordings(),
+            child: const Text('ローカル録音を全削除（仮）'),
+          ),
           if (state.isLoading)
             const Padding(
               padding: EdgeInsets.all(16),

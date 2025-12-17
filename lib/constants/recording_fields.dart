@@ -8,5 +8,7 @@ class RecordingFields {
   static const uploadStatus = 'uploadStatus';
   static const createdAt = 'createdAt';
   static const memo = 'memo';
+  static const title = 'title';
+  static const newWords = 'newWords';
 }
 

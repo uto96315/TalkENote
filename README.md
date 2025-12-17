@@ -72,6 +72,24 @@ lib/
 
 ---
 
+## 📦 データストア構成（録音）
+
+- Firebase Storage  
+  - `recordings/{userId}/{recordingId}.m4a`
+- Cloud Firestore  
+  - Collection: `recordings`  
+    - Doc: `{recordingId}`  
+      - `userId`: string  
+      - `storagePath`: string (Storage上のフルパス)  
+      - `durationSec`: number  
+      - `uploadStatus`: "pending" | "uploaded" | "failed"  
+      - `createdAt`: Timestamp (serverTimestamp)  
+      - `title`: string (optional)  
+      - `memo`: string (optional)  
+      - `newWords`: string[] (optional)
+
+---
+
 ## 🎯 プロジェクト目標
 **12/14に MVP をリリースする！**
 
