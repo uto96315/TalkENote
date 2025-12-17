@@ -117,6 +117,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     state = state.copyWith(isLoading: true);
     final recordingId = _recordingRepo.newRecordingId();
     final plannedStoragePath = 'recordings/${user.uid}/$recordingId.m4a';
+    var metadataSaved = false;
     try {
       final duration = await _measureDuration(path);
       final now = DateTime.now();
@@ -132,6 +133,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
         newWords: const [],
         status: UploadStatus.pending,
       );
+      metadataSaved = true;
 
       final storagePath = await _recordingRepo.uploadRecording(
         userId: user.uid,
@@ -151,12 +153,15 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       }
     } catch (e, s) {
       debugPrint('Failed to upload recording: $e $s');
-      try {
-        await _recordingRepo.updateStatus(
-          recordingId: recordingId,
-          status: UploadStatus.failed,
-        );
-      } catch (_) {}
+      // saveMetadataが成功している場合のみステータス更新を試みる
+      if (metadataSaved) {
+        try {
+          await _recordingRepo.updateStatus(
+            recordingId: recordingId,
+            status: UploadStatus.failed,
+          );
+        } catch (_) {}
+      }
     } finally {
       state = state.copyWith(isLoading: false);
     }
