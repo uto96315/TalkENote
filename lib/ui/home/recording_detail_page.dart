@@ -1,9 +1,15 @@
+// ignore_for_file: avoid_print
+
+import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../constants/upload_status.dart';
 import '../../data/model/recording.dart';
+import '../../data/model/sentence.dart';
+import '../../provider/ai_provider.dart';
 import '../../provider/recording_provider.dart';
+import '../../constants/transcript_status.dart';
 
 class RecordingDetailPage extends ConsumerStatefulWidget {
   const RecordingDetailPage({super.key, required this.recording});
@@ -18,11 +24,15 @@ class RecordingDetailPage extends ConsumerStatefulWidget {
 class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _memoCtrl;
+  late Recording _recording;
   bool _saving = false;
+  bool _splitting = false;
 
   @override
   void initState() {
     super.initState();
+    _recording = widget.recording;
+    _log('DetailPage init for recordingId=${_recording.id}');
     _titleCtrl = TextEditingController(text: widget.recording.title ?? '');
     _memoCtrl = TextEditingController(text: widget.recording.memo ?? '');
   }
@@ -36,7 +46,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final recording = widget.recording;
+    final recording = _recording;
     final repo = ref.read(recordingRepositoryProvider);
     final created = recording.createdAt?.toDate();
     final dateLabel = created != null
@@ -130,6 +140,54 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
                       .toList(),
                 ),
               ],
+              const SizedBox(height: 24),
+              Text(
+                '文字起こしと分割',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 12,
+                runSpacing: 8,
+                children: [
+                  ElevatedButton.icon(
+                    icon: _recording.transcriptStatus ==
+                            TranscriptStatus.transcribing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.translate),
+                    label: const Text('文字起こしする'),
+                    onPressed: () {
+                      debugPrint("tapped");
+                      _recording.transcriptStatus ==
+                              TranscriptStatus.transcribing
+                          ? null
+                          : _onTranscribe();
+                    },
+                  ),
+                  ElevatedButton.icon(
+                    icon: _splitting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.format_list_bulleted),
+                    label: const Text('文に分割'),
+                    onPressed: _splitting ? null : _onSplitSentences,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              _TranscriptCard(text: recording.transcriptRaw),
+              const SizedBox(height: 16),
+              _SentencesSection(
+                sentences: recording.sentences,
+                onEdit: _editSentence,
+              ),
             ],
           ),
         ),
@@ -152,6 +210,278 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
           child: Text(value.isEmpty ? '-' : value),
         ),
       ],
+    );
+  }
+
+  Future<void> _onTranscribe() async {
+    final scaffold = ScaffoldMessenger.of(context);
+    final repo = ref.read(recordingRepositoryProvider);
+    final transcription = ref.read(transcriptionServiceProvider);
+    if (!transcription.isConfigured) {
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('OpenAI APIキーが設定されていません (.env)')),
+      );
+      return;
+    }
+    _log('Transcribe 🎙️: start (id=${_recording.id})');
+    debugPrint('Transcribe 🎙️: start (id=${_recording.id})');
+    setState(() {
+      _recording = _recording.copyWith(
+        transcriptStatus: TranscriptStatus.transcribing,
+      );
+    });
+    _log('Transcribe 🎙️: status -> transcribing (local)');
+    await repo.updateTranscriptStatus(
+      recordingId: _recording.id,
+      status: TranscriptStatus.transcribing,
+    );
+    _log('Transcribe 🎙️: status -> transcribing (remote)');
+    var success = false;
+    try {
+      final url = await repo.downloadUrl(_recording.storagePath);
+      final fileName = _recording.storagePath.split('/').last;
+      _log('Transcribe 🎙️: download URL ready for $fileName');
+      final text =
+          await transcription.transcribeFromUrl(url, fileName: fileName);
+      _log('Transcribe 🎙️: whisper done ✅ saving text (${text.length} chars)');
+      await repo.updateTranscriptRaw(
+        recordingId: _recording.id,
+        transcriptRaw: text,
+      );
+      _log('Transcribe 🎙️: transcriptRaw saved to Firestore');
+      setState(() {
+        _recording = _recording.copyWith(
+          transcriptRaw: text,
+          sentences: const [],
+          transcriptStatus: TranscriptStatus.done,
+        );
+      });
+      _log('Transcribe 🎙️: state -> done ✅ (local)');
+      success = true;
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('文字起こしが完了しました')),
+      );
+    } catch (e) {
+      _log('Transcribe 🎙️: failed ❌ $e');
+      await repo.updateTranscriptStatus(
+        recordingId: _recording.id,
+        status: TranscriptStatus.failed,
+      );
+      scaffold.showSnackBar(
+        SnackBar(content: Text('文字起こしに失敗しました: $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _recording = _recording.copyWith(
+            transcriptStatus:
+                success ? TranscriptStatus.done : TranscriptStatus.failed,
+          );
+        });
+      }
+    }
+  }
+
+  Future<void> _onSplitSentences() async {
+    final scaffold = ScaffoldMessenger.of(context);
+    final splitter = ref.read(sentenceSplitterServiceProvider);
+    final repo = ref.read(recordingRepositoryProvider);
+    final raw = _recording.transcriptRaw?.trim() ?? '';
+
+    if (raw.isEmpty) {
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('先に文字起こしを実行してください')),
+      );
+      return;
+    }
+    if (!splitter.isConfigured) {
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('OpenAI APIキーが設定されていません (.env)')),
+      );
+      return;
+    }
+    _log('Split ✂️: start (id=${_recording.id})');
+    setState(() => _splitting = true);
+    try {
+      final sentencesText = await splitter.splitSentences(raw);
+      _log('Split ✂️: AI returned ${sentencesText.length} sentences');
+      final sentences =
+          sentencesText.map((t) => Sentence.withGeneratedId(t)).toList();
+      await repo.updateSentences(
+        recordingId: _recording.id,
+        sentences: sentences,
+      );
+      _log('Split ✂️: sentences saved to Firestore');
+      setState(() {
+        _recording = _recording.copyWith(sentences: sentences);
+      });
+      _log('Split ✂️: state updated ✅');
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('文分割が完了しました')),
+      );
+    } catch (e) {
+      _log('Split ✂️: failed ❌ $e');
+      scaffold.showSnackBar(
+        SnackBar(content: Text('文分割に失敗しました: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _splitting = false);
+    }
+  }
+
+  Future<void> _editSentence(Sentence sentence) async {
+    final scaffold = ScaffoldMessenger.of(context);
+    final repo = ref.read(recordingRepositoryProvider);
+    final ctrl = TextEditingController(text: sentence.text);
+    final updatedText = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('文を編集'),
+          content: TextField(
+            controller: ctrl,
+            minLines: 1,
+            maxLines: 4,
+            autofocus: true,
+            decoration: const InputDecoration(
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('キャンセル'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
+              child: const Text('保存'),
+            ),
+          ],
+        );
+      },
+    );
+    if (updatedText == null) return;
+    if (updatedText.isEmpty) {
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('空の文は保存できません')),
+      );
+      return;
+    }
+
+    final newSentences = _recording.sentences
+        .map(
+          (s) => s.id == sentence.id ? s.copyWith(text: updatedText) : s,
+        )
+        .toList();
+    try {
+      await repo.updateSentences(
+        recordingId: _recording.id,
+        sentences: newSentences,
+      );
+      setState(() {
+        _recording = _recording.copyWith(sentences: newSentences);
+      });
+      scaffold.showSnackBar(
+        const SnackBar(content: Text('更新しました')),
+      );
+    } catch (e) {
+      scaffold.showSnackBar(
+        SnackBar(content: Text('更新に失敗しました: $e')),
+      );
+    }
+  }
+}
+
+void _log(String message) {
+  print(message); // keep stdout
+  dev.log(message,
+      name: 'RecordingDetailPage'); // ensure OS log (Xcode/console)
+}
+
+class _TranscriptCard extends StatelessWidget {
+  const _TranscriptCard({required this.text});
+
+  final String? text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final value = text?.trim() ?? '';
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '全文テキスト',
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            if (value.isEmpty)
+              Text(
+                'まだ文字起こしされていません',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.hintColor),
+              )
+            else
+              SelectableText(value),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SentencesSection extends StatelessWidget {
+  const _SentencesSection({
+    required this.sentences,
+    required this.onEdit,
+  });
+
+  final List<Sentence> sentences;
+  final void Function(Sentence sentence) onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '文リスト（編集可）',
+              style: theme.textTheme.titleSmall,
+            ),
+            const SizedBox(height: 8),
+            if (sentences.isEmpty)
+              Text(
+                'まだ分割されていません。「文に分割」を押してください。',
+                style: theme.textTheme.bodyMedium
+                    ?.copyWith(color: theme.hintColor),
+              )
+            else
+              ListView.separated(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: sentences.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, i) {
+                  final s = sentences[i];
+                  return ListTile(
+                    title: Text(s.text),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => onEdit(s),
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
+      ),
     );
   }
 }

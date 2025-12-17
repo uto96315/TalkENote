@@ -172,13 +172,14 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
                             ),
                           ],
                         ),
-                        onTap: () {
-                          Navigator.of(context).push(
+                        onTap: () async {
+                          await Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) =>
                                   RecordingDetailPage(recording: rec),
                             ),
                           );
+                          await _load();
                         },
                       ),
                     );

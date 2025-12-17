@@ -10,5 +10,7 @@ class RecordingFields {
   static const memo = 'memo';
   static const title = 'title';
   static const newWords = 'newWords';
+  static const transcriptRaw = 'transcriptRaw';
+  static const sentences = 'sentences';
+  static const transcriptStatus = 'transcriptStatus';
 }
-
