@@ -27,21 +27,25 @@ class HomeState {
     this.files = const [],
     this.isRecording = false,
     this.isLoading = false,
+    this.recordingElapsed = Duration.zero,
   });
 
   final List<FileSystemEntity> files;
   final bool isRecording;
   final bool isLoading;
+  final Duration recordingElapsed;
 
   HomeState copyWith({
     List<FileSystemEntity>? files,
     bool? isRecording,
     bool? isLoading,
+    Duration? recordingElapsed,
   }) {
     return HomeState(
       files: files ?? this.files,
       isRecording: isRecording ?? this.isRecording,
       isLoading: isLoading ?? this.isLoading,
+      recordingElapsed: recordingElapsed ?? this.recordingElapsed,
     );
   }
 }
@@ -65,6 +69,8 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   late final TranslationSuggestionService _translator;
   bool _isLoadingFiles = false;
   Timer? _autoStopTimer;
+  Timer? _elapsedTimer;
+  DateTime? _recordingStartedAt;
 
   @override
   HomeState build() {
@@ -73,7 +79,10 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     _transcription = ref.read(transcriptionServiceProvider);
     _splitter = ref.read(sentenceSplitterServiceProvider);
     _translator = ref.read(translationSuggestionServiceProvider);
-    ref.onDispose(() => _autoStopTimer?.cancel());
+    ref.onDispose(() {
+      _autoStopTimer?.cancel();
+      _elapsedTimer?.cancel();
+    });
     Future.microtask(_loadFiles); // 非同期に初回ロードを開始
     return const HomeState(isLoading: true);
   }
@@ -85,21 +94,32 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     }
 
     await _recordService.start();
-    state = state.copyWith(isRecording: true);
+    _recordingStartedAt = DateTime.now();
+    state = state.copyWith(
+      isRecording: true,
+      recordingElapsed: Duration.zero,
+    );
     _scheduleAutoStop();
+    _startElapsedTicker();
   }
 
   Future<void> _stopRecording() async {
     if (!state.isRecording) return;
     _autoStopTimer?.cancel();
     _autoStopTimer = null;
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+    _recordingStartedAt = null;
     String? path;
     try {
       path = await _recordService.stop();
     } catch (e, s) {
       debugPrint('Failed to stop recording: $e $s');
     }
-    state = state.copyWith(isRecording: false);
+    state = state.copyWith(
+      isRecording: false,
+      recordingElapsed: Duration.zero,
+    );
     if (path != null) {
       await _loadFiles();
       await _uploadRecording(path);
@@ -110,6 +130,16 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     _autoStopTimer?.cancel();
     _autoStopTimer = Timer(_maxRecordingDuration, () {
       _stopRecording();
+    });
+  }
+
+  void _startElapsedTicker() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final started = _recordingStartedAt;
+      if (!state.isRecording || started == null) return;
+      final elapsed = DateTime.now().difference(started);
+      state = state.copyWith(recordingElapsed: elapsed);
     });
   }
 
