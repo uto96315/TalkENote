@@ -55,7 +55,6 @@ class RecordingRepository {
   Future<void> saveMetadata({
     required String recordingId,
     required String userId,
-    required String storagePath,
     required double durationSec,
     String? memo,
     String? title,
@@ -65,7 +64,7 @@ class RecordingRepository {
     final recording = Recording(
       id: recordingId,
       userId: userId,
-      storagePath: storagePath,
+      storagePath: '',
       durationSec: durationSec,
       uploadStatus: status,
       memo: memo,
@@ -86,7 +85,7 @@ class RecordingRepository {
     await _collection.doc(recordingId).set(
           Recording.statusUpdate(
             status: status,
-            newStoragePath: storagePath,
+            newStoragePath: null,
           ),
           SetOptions(merge: true),
         );
