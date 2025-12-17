@@ -1,4 +1,1 @@
-
-
-extension DateTimeExt on DateTime {
-}
+extension DateTimeExt on DateTime {}

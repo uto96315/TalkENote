@@ -28,7 +28,7 @@ class _SplashPageState extends State<SplashPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,   // iOS/Androidで真っ白が無難
+      backgroundColor: Colors.white, // iOS/Androidで真っ白が無難
       body: Container(
         decoration: BoxDecoration(
           gradient: AppColors.splashGradient,
@@ -36,7 +36,7 @@ class _SplashPageState extends State<SplashPage> {
         child: Center(
           child: Lottie.asset(
             'assets/animations/splash.json',
-            fit: BoxFit.contain,     // ← ポイント：上下左右にフィットして縦長でもいける
+            fit: BoxFit.contain, // ← ポイント：上下左右にフィットして縦長でもいける
           ),
         ),
       ),
