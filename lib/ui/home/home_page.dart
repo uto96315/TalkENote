@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/home_tab.dart';
+import '../../provider/home_provider.dart';
+import '../../provider/recording_provider.dart';
 import 'widgets/home_tab.dart';
 import 'widgets/recordings_list.dart';
 
@@ -25,7 +27,15 @@ class HomePage extends ConsumerWidget {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: tabs.indexOf(tab),
         selectedItemColor: AppColors.primary,
-        onTap: (index) => notifier.state = tabs[index],
+        onTap: (index) {
+          final next = tabs[index];
+          notifier.state = next;
+          if (next == HomeTab.home) {
+            ref.read(homeViewModelProvider.notifier).refreshFiles();
+          } else if (next == HomeTab.note) {
+            ref.read(recordingsReloadTickProvider.notifier).state++;
+          }
+        },
         items: [
           for (final t in tabs)
             BottomNavigationBarItem(
