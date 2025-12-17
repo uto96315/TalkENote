@@ -9,4 +9,14 @@ class AudioFileRepository {
     return files.where((f) => f.path.endsWith('.m4a')).toList()
       ..sort((a, b) => b.path.compareTo(a.path)); // 新しい順
   }
+
+  Future<void> deleteAllRecordings() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final files = await dir.list().toList();
+    for (final f in files) {
+      if (f.path.endsWith('.m4a')) {
+        await f.delete();
+      }
+    }
+  }
 }
