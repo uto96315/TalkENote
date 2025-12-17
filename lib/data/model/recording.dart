@@ -26,6 +26,26 @@ class Recording {
   final String? title;
   final List<String> newWords;
 
+  factory Recording.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data();
+    return Recording(
+      id: doc.id,
+      userId: data[RecordingFields.userId] as String? ?? '',
+      storagePath: data[RecordingFields.storagePath] as String? ?? '',
+      durationSec: (data[RecordingFields.durationSec] as num?)?.toDouble() ?? 0,
+      uploadStatus: UploadStatusX.fromValue(
+        data[RecordingFields.uploadStatus] as String? ?? '',
+      ),
+      createdAt: data[RecordingFields.createdAt] as Timestamp?,
+      memo: data[RecordingFields.memo] as String? ?? '',
+      title: data[RecordingFields.title] as String?,
+      newWords: (data[RecordingFields.newWords] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+    );
+  }
+
   Map<String, dynamic> toCreatePayload() {
     return {
       RecordingFields.userId: userId,
