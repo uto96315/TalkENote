@@ -1,7 +1,7 @@
 name: talkenote
 description: "A new Flutter project."
 
-publish_to: 'none' 
+publish_to: "none"
 
 version: 1.0.0+1
 
@@ -20,26 +20,31 @@ dependencies:
   firebase_core: ^3.0.0
   firebase_auth: ^5.3.0
   cloud_firestore: ^5.6.0
+  record: ^5.1.0
+  path_provider: ^2.1.2
+  just_audio: ^0.9.38
+
+dependency_overrides:
+  record_linux: ^1.0.0
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/icons/app_icon.png"
   remove_alpha_ios: true
-  adaptive_icon_background: "#61B8FF"   
+  adaptive_icon_background: "#61B8FF"
   adaptive_icon_foreground: "assets/icons/app_icon.png"
 
 flutter_native_splash:
   android: true
   ios: true
 
-  image: assets/images/splash.png 
+  image: assets/images/splash.png
   color: "#A5F6A8"
 
   android_12:
     image: assets/images/splash.png
     icon_background_color: "#A5F6A8"
-
 
 dev_dependencies:
   flutter_test:
