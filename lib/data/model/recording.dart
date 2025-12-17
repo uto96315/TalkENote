@@ -75,7 +75,7 @@ class Recording {
   Map<String, dynamic> toCreatePayload() {
     return {
       RecordingFields.userId: userId,
-      RecordingFields.storagePath: storagePath,
+      // storagePath is no longer stored
       RecordingFields.durationSec: durationSec,
       RecordingFields.uploadStatus: uploadStatus.value,
       RecordingFields.createdAt: FieldValue.serverTimestamp(),
@@ -95,7 +95,7 @@ class Recording {
   }) {
     return {
       RecordingFields.uploadStatus: status.value,
-      if (newStoragePath != null) RecordingFields.storagePath: newStoragePath,
+      // storagePath is no longer stored
     };
   }
 
