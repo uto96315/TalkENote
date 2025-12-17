@@ -11,5 +11,17 @@ extension UploadStatusX on UploadStatus {
         return 'failed';
     }
   }
+
+  static UploadStatus fromValue(String value) {
+    switch (value) {
+      case 'pending':
+        return UploadStatus.pending;
+      case 'uploaded':
+        return UploadStatus.uploaded;
+      case 'failed':
+      default:
+        return UploadStatus.failed;
+    }
+  }
 }
 
