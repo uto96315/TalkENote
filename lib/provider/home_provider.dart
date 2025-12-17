@@ -49,7 +49,7 @@ class HomeState {
       isRecording: isRecording ?? this.isRecording,
       isLoading: isLoading ?? this.isLoading,
       recordingElapsed: recordingElapsed ?? this.recordingElapsed,
-      errorMessage: errorMessage,
+      errorMessage: errorMessage ?? this.errorMessage,
     );
   }
 }

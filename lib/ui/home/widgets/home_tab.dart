@@ -33,14 +33,7 @@ class HomeTabPage extends ConsumerWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color.fromARGB(255, 177, 245, 179),
-            AppColors.primary.withValues(alpha: 0.6),
-          ],
-        ),
+        gradient: AppColors.homeGradient,
       ),
       child: SafeArea(
         child: Column(
