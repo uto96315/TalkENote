@@ -12,6 +12,7 @@ class AppColors {
   static const Color success = Color(0xFF22C55E);
   static const Color warning = Color(0xFFF59E0B);
   static const Color error = Color(0xFFEF4444);
+  static const Color white = Color(0xFFFFFFFF);
 
   // グラデーション
   static const gradientTop = Color(0xFFA5F6A8);

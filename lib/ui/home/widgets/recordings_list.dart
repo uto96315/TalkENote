@@ -90,15 +90,24 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
             if (!_isLoading && _items.isEmpty && _error == null)
               Expanded(
                 child: Center(
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Text(
-                      'まだ記録がありません',
-                      style: TextStyle(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.mic_none,
+                        size: 64,
+                        color: AppColors.white.withOpacity(0.6),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'まだ記録がありません',
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: AppColors.textSecondary),
-                    ),
+                          fontSize: 18,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -132,6 +141,23 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _list(Recording rec, String dateLabel) {
+    return Card(
+      child: ListTile(
+        title: Text(rec.title ?? '(タイトルなし)'),
+        subtitle: Text(dateLabel),
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RecordingDetailPage(recording: rec),
+            ),
+          );
+          await _load();
+        },
       ),
     );
   }

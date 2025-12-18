@@ -39,6 +39,50 @@ class RecordingRepository {
     return snap.docs.map(Recording.fromDoc).toList();
   }
 
+  Future<Recording?> fetchRecordingById(String recordingId) async {
+    final doc = await _collection.doc(recordingId).get();
+    if (!doc.exists) return null;
+    // DocumentSnapshotをQueryDocumentSnapshotとして扱うために、データを再構築
+    final data = doc.data();
+    if (data == null) return null;
+    // Recording.fromDocはQueryDocumentSnapshotを期待しているが、
+    // 実際にはMap<String, dynamic>から構築できるようにする必要がある
+    // 簡易的に、idとdataを組み合わせてRecordingを作成
+    return Recording(
+      id: doc.id,
+      userId: data[RecordingFields.userId] as String? ?? '',
+      storagePath: data[RecordingFields.storagePath] as String? ?? '',
+      durationSec: (data[RecordingFields.durationSec] as num?)?.toDouble() ?? 0,
+      uploadStatus: UploadStatusX.fromValue(
+        data[RecordingFields.uploadStatus] as String? ?? '',
+      ),
+      createdAt: data[RecordingFields.createdAt] as Timestamp?,
+      memo: data[RecordingFields.memo] as String?,
+      title: data[RecordingFields.title] as String?,
+      newWords: (data[RecordingFields.newWords] as List<dynamic>?)
+              ?.map((e) => e.toString())
+              .toList() ??
+          const [],
+      transcriptRaw: data[RecordingFields.transcriptRaw] as String?,
+      sentences: (data[RecordingFields.sentences] as List<dynamic>?)
+              ?.map((e) {
+                if (e is Map<String, dynamic>) {
+                  return Sentence.fromMap(e);
+                }
+                if (e is Map) {
+                  return Sentence.fromMap(Map<String, dynamic>.from(e));
+                }
+                return null;
+              })
+              .whereType<Sentence>()
+              .toList() ??
+          const [],
+      transcriptStatus: TranscriptStatusX.fromValue(
+        data[RecordingFields.transcriptStatus] as String? ?? '',
+      ),
+    );
+  }
+
   Future<String> downloadUrl(String storagePath) async {
     return _storage.ref(storagePath).getDownloadURL();
   }
