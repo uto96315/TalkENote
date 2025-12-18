@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:just_audio/just_audio.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/home_tab.dart';
@@ -10,11 +11,33 @@ import 'widgets/recordings_list.dart';
 
 final currentTabProvider = StateProvider<HomeTab>((ref) => HomeTab.home);
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  final _tabSoundPlayer = AudioPlayer();
+
+  @override
+  void dispose() {
+    _tabSoundPlayer.dispose();
+    super.dispose();
+  }
+
+  Future<void> _playTabSound() async {
+    try {
+      await _tabSoundPlayer.setAsset('assets/sounds/move_tab.mp3');
+      await _tabSoundPlayer.play();
+    } catch (e) {
+      debugPrint('Failed to play tab sound: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final tab = ref.watch(currentTabProvider);
     final notifier = ref.read(currentTabProvider.notifier);
     final tabs = HomeTab.values;
@@ -31,6 +54,10 @@ class HomePage extends ConsumerWidget {
           tabs: tabs,
           current: tab,
           onTap: (next) {
+            // 同じタブをタップした場合は音を鳴らさない
+            if (next != tab) {
+              _playTabSound();
+            }
             notifier.state = next;
             if (next == HomeTab.home) {
               ref.read(homeViewModelProvider.notifier).refreshFiles();

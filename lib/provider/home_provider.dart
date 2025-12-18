@@ -5,6 +5,7 @@ import 'dart:typed_data';
 // ignore_for_file: avoid_print
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
@@ -71,6 +72,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   late final TranscriptionService _transcription;
   late final SentenceSplitterService _splitter;
   late final TranslationSuggestionService _translator;
+  final _soundPlayer = AudioPlayer();
   bool _isLoadingFiles = false;
   Timer? _autoStopTimer;
   Timer? _elapsedTimer;
@@ -86,6 +88,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     ref.onDispose(() {
       _autoStopTimer?.cancel();
       _elapsedTimer?.cancel();
+      _soundPlayer.dispose();
     });
     Future.microtask(_loadFiles); // 非同期に初回ロードを開始
     return const HomeState(isLoading: true);
@@ -98,6 +101,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     }
 
     await _recordService.start();
+    _playSound('click');
     _recordingStartedAt = DateTime.now();
     state = state.copyWith(
       isRecording: true,
@@ -143,6 +147,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       recordingElapsed: Duration.zero,
       errorMessage: null,
     );
+    _playSound('alert');
     if (path != null) {
       await _loadFiles();
       await _uploadRecording(path);
@@ -266,6 +271,30 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   void clearError() {
     if (state.errorMessage != null) {
       state = state.copyWith(errorMessage: null);
+    }
+  }
+
+  Future<void> _playSound(String type) async {
+    try {
+      // 録音中でも確実に鳴るように、just_audio でアセット音声を再生
+      final assetPath = type == 'click'
+          ? 'assets/sounds/rec_start.mp3'
+          : 'assets/sounds/rec_stop.mp3';
+      await _soundPlayer.setAsset(assetPath);
+      await _soundPlayer.play();
+    } catch (e) {
+      debugPrint('Failed to play sound: $e');
+      // 音声ファイルがない場合やエラーが発生しても、アプリの動作は続行
+      // フォールバックとして SystemSound を試す
+      try {
+        if (type == 'click') {
+          SystemSound.play(SystemSoundType.click);
+        } else if (type == 'alert') {
+          SystemSound.play(SystemSoundType.alert);
+        }
+      } catch (_) {
+        // SystemSound も失敗した場合は無視
+      }
     }
   }
 

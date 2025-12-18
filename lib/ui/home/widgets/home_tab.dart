@@ -21,7 +21,22 @@ class HomeTabPage extends ConsumerWidget {
       // エラーメッセージが新しく設定された場合のみ処理（無限ループを防ぐ）
       if (nextMsg != null && nextMsg.isNotEmpty && prevMsg != nextMsg) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(nextMsg)),
+          SnackBar(
+            content: Text(
+              nextMsg,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            backgroundColor: AppColors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            elevation: 8,
+          ),
         );
         // エラーをクリアするのは、次のフレームで実行（無限ループを防ぐ）
         Future.microtask(() {
@@ -178,8 +193,7 @@ class _RecordButtonState extends State<_RecordButton>
               ),
               boxShadow: [
                 BoxShadow(
-                  color:
-                      baseColor.withOpacity(widget.isRecording ? 0.45 : 0.3),
+                  color: baseColor.withOpacity(widget.isRecording ? 0.45 : 0.3),
                   blurRadius: widget.isRecording ? 30 : 18,
                   spreadRadius: widget.isRecording ? 8 : 4,
                 ),
@@ -240,7 +254,8 @@ class _Pulse extends StatelessWidget {
       parent: controller,
       curve: Interval(delay, 1.0, curve: Curves.easeOut),
     );
-    final scale = Tween<double>(begin: beginScale, end: endScale).animate(curved);
+    final scale =
+        Tween<double>(begin: beginScale, end: endScale).animate(curved);
     final opacity =
         Tween<double>(begin: beginOpacity, end: endOpacity).animate(curved);
 
