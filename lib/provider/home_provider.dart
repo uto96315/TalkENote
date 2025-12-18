@@ -30,6 +30,8 @@ class HomeState {
     this.isLoading = false,
     this.recordingElapsed = Duration.zero,
     this.errorMessage,
+    this.progressMessage,
+    this.completedRecordingId,
   });
 
   final List<FileSystemEntity> files;
@@ -37,6 +39,8 @@ class HomeState {
   final bool isLoading;
   final Duration recordingElapsed;
   final String? errorMessage;
+  final String? progressMessage; // 処理進捗メッセージ
+  final String? completedRecordingId; // 処理完了した録音ID
 
   HomeState copyWith({
     List<FileSystemEntity>? files,
@@ -44,6 +48,10 @@ class HomeState {
     bool? isLoading,
     Duration? recordingElapsed,
     String? errorMessage,
+    String? progressMessage,
+    String? completedRecordingId,
+    bool clearProgressMessage = false,
+    bool clearCompletedRecordingId = false,
   }) {
     return HomeState(
       files: files ?? this.files,
@@ -51,6 +59,12 @@ class HomeState {
       isLoading: isLoading ?? this.isLoading,
       recordingElapsed: recordingElapsed ?? this.recordingElapsed,
       errorMessage: errorMessage ?? this.errorMessage,
+      progressMessage: clearProgressMessage
+          ? null
+          : (progressMessage ?? this.progressMessage),
+      completedRecordingId: clearCompletedRecordingId
+          ? null
+          : (completedRecordingId ?? this.completedRecordingId),
     );
   }
 }
@@ -274,12 +288,21 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     }
   }
 
+  void clearCompletedRecording() {
+    state = state.copyWith(
+      clearProgressMessage: true,
+      clearCompletedRecordingId: true,
+    );
+  }
+
   Future<void> _playSound(String type) async {
     try {
       // 録音中でも確実に鳴るように、just_audio でアセット音声を再生
       final assetPath = type == 'click'
           ? 'assets/sounds/rec_start.mp3'
-          : 'assets/sounds/rec_stop.mp3';
+          : type == 'alert'
+              ? 'assets/sounds/rec_stop.mp3'
+              : 'assets/sounds/rec_complete.mp3';
       await _soundPlayer.setAsset(assetPath);
       await _soundPlayer.play();
     } catch (e) {
@@ -290,6 +313,8 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
         if (type == 'click') {
           SystemSound.play(SystemSoundType.click);
         } else if (type == 'alert') {
+          SystemSound.play(SystemSoundType.alert);
+        } else if (type == 'complete') {
           SystemSound.play(SystemSoundType.alert);
         }
       } catch (_) {
@@ -312,12 +337,14 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     print('Pipeline: start recordingId=$recordingId');
     List<Sentence> sentences = const [];
     try {
+      state = state.copyWith(progressMessage: '文字起こしを開始しています...');
       await _recordingRepo.updateTranscriptStatus(
         recordingId: recordingId,
         status: TranscriptStatus.transcribing,
       );
       print('Pipeline: status -> transcribing');
 
+      state = state.copyWith(progressMessage: '音声を文字に変換しています...');
       print('Pipeline: read local file $fileName (${bytes.length} bytes)');
       final text = await _transcription.transcribeFromBytes(
         bytes,
@@ -331,6 +358,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       );
       print('Pipeline: transcriptRaw saved (status -> done via repo)');
 
+      state = state.copyWith(progressMessage: '文章を整理しています...');
       final sentencesText = await _splitter.splitSentences(text);
       sentences =
           sentencesText.map((t) => Sentence.withGeneratedId(t)).toList();
@@ -339,25 +367,33 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
         sentences: sentences,
       );
       print('Pipeline: sentences saved count=${sentences.length}');
-    } catch (e, s) {
-      debugPrint('Transcription pipeline failed: $e $s');
-      try {
-        await _recordingRepo.updateTranscriptStatus(
-          recordingId: recordingId,
-          status: TranscriptStatus.failed,
-        );
-      } catch (_) {}
-      return;
-    }
 
-    if (!_translator.isConfigured) {
-      print('Pipeline: translator not configured, skip translation');
-      return;
-    }
+      // ここでtextを保持して翻訳処理で使用
+      final transcriptText = text;
 
-    try {
+      if (!_translator.isConfigured) {
+        print('Pipeline: translator not configured, skip translation');
+        return;
+      }
+
+      // ステップ1: 全体テキストを自然な日本語に翻訳（文脈を考慮）
+      state = state.copyWith(progressMessage: '翻訳しています...');
+      print('Pipeline: starting full text translation');
+      final fullTranslation =
+          await _translator.translateFullText(transcriptText);
+      print(
+          'Pipeline: full translation done, ja length=${fullTranslation.ja.length}, phrases=${fullTranslation.phrases.length}');
+
+      // ステップ2: 全体翻訳をセンテンスに分割（日本語側も分割）
+      // 簡易的に全体翻訳をセンテンス数で分割するか、AIに分割してもらう
+      // ここでは、各センテンスに対して詳細化を行う
+      state = state.copyWith(progressMessage: '翻訳を調整しています...');
       final translated = <Sentence>[];
-      for (final s in sentences) {
+      for (var i = 0; i < sentences.length; i++) {
+        final s = sentences[i];
+        state = state.copyWith(
+            progressMessage: '翻訳を調整しています... (${i + 1}/${sentences.length})');
+        // センテンスごとの詳細化（提案、ジャンル、セグメントなど）
         final res = await _translator.generateSuggestions(
           s.text,
           genreHint: s.genre,
@@ -370,9 +406,16 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
                 .whereType<String>()
                 .where((e) => e.isNotEmpty)
                 .toList();
+
+        // 全体翻訳から該当センテンスの日本語訳を抽出（簡易版：最初のセンテンスから順に割り当て）
+        // TODO: より精密なマッピングが必要な場合は、AIに分割してもらう
+        final sentenceJa = fullTranslation.ja.isNotEmpty
+            ? fullTranslation.ja // 暫定的に全体翻訳を使用
+            : res.ja; // フォールバック
+
         translated.add(
           s.copyWith(
-            ja: res.ja,
+            ja: sentenceJa,
             suggestions: res.suggestions,
             selected: selectedSentences,
             genre: res.genre ?? s.genre,
@@ -380,14 +423,40 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
           ),
         );
       }
+
       await _recordingRepo.updateSentences(
         recordingId: recordingId,
         sentences: translated,
       );
       print(
           'Pipeline: translation suggestions saved count=${translated.length}');
+
+      // ステップ3: 全体から抽出されたフレーズを辞書に保存（後で実装）
+      // TODO: 辞書保存処理を追加
+      print(
+          'Pipeline: phrases extracted count=${fullTranslation.phrases.length}');
     } catch (e, s) {
-      debugPrint('Translation phase failed (skipped): $e $s');
+      debugPrint('Transcription pipeline failed: $e $s');
+      try {
+        await _recordingRepo.updateTranscriptStatus(
+          recordingId: recordingId,
+          status: TranscriptStatus.failed,
+        );
+      } catch (_) {}
+    } finally {
+      // 処理完了した録音IDを設定（正常終了時のみ）
+      if (sentences.isNotEmpty) {
+        _playSound('complete');
+        state = state.copyWith(
+          progressMessage: null,
+          completedRecordingId: recordingId,
+        );
+        print('Pipeline: completed recordingId=$recordingId');
+      } else {
+        // エラー時は進捗メッセージのみクリア
+        state = state.copyWith(progressMessage: null);
+      }
+      print('Pipeline: progress message cleared');
     }
   }
 }

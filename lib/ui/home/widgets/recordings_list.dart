@@ -144,4 +144,21 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
       ),
     );
   }
+
+  Widget _list(Recording rec, String dateLabel) {
+    return Card(
+      child: ListTile(
+        title: Text(rec.title ?? '(タイトルなし)'),
+        subtitle: Text(dateLabel),
+        onTap: () async {
+          await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => RecordingDetailPage(recording: rec),
+            ),
+          );
+          await _load();
+        },
+      ),
+    );
+  }
 }

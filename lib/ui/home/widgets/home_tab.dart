@@ -3,6 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../constants/app_colors.dart';
 import '../../../provider/home_provider.dart';
+import '../../../provider/recording_provider.dart';
+import '../../../provider/auth_provider.dart';
+import '../recording_detail_page.dart';
 
 class HomeTabPage extends ConsumerWidget {
   const HomeTabPage({super.key});
@@ -94,9 +97,167 @@ class HomeTabPage extends ConsumerWidget {
                     color: Colors.white70,
                   ),
             ),
+            if (state.progressMessage != null ||
+                state.completedRecordingId != null) ...[
+              const SizedBox(height: 40),
+              Container(
+                padding: const EdgeInsets.all(20),
+                margin: const EdgeInsets.symmetric(horizontal: 24),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: state.completedRecordingId != null
+                    ? _buildCompletedState(
+                        context, ref, state.completedRecordingId!)
+                    : _buildProgressState(state.progressMessage!),
+              ),
+            ],
+            const Spacer(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProgressState(String message) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(
+          width: 20,
+          height: 20,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Flexible(
+          child: Text(
+            message,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCompletedState(
+    BuildContext context,
+    WidgetRef ref,
+    String recordingId,
+  ) {
+    return Column(
+      children: [
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.check_circle,
+              color: Colors.white,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              '完了しました',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 15),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              InkWell(
+                onTap: () {
+                  ref
+                      .read(homeViewModelProvider.notifier)
+                      .clearCompletedRecording();
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: AppColors.white.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Text(
+                    '閉じる',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () async {
+                  final recordingRepo = ref.read(recordingRepositoryProvider);
+                  final authRepo = ref.read(authRepositoryProvider);
+                  final user = authRepo.currentUser;
+
+                  if (user == null) return;
+
+                  // 完了した録音IDをクリア
+                  ref
+                      .read(homeViewModelProvider.notifier)
+                      .clearCompletedRecording();
+
+                  // 録音データを取得
+                  final recording =
+                      await recordingRepo.fetchRecordingById(recordingId);
+                  if (recording != null && context.mounted) {
+                    await Navigator.of(context).push(
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) =>
+                            RecordingDetailPage(recording: recording),
+                        transitionsBuilder:
+                            (context, animation, secondaryAnimation, child) {
+                          const begin = Offset(1.0, 0.0);
+                          const end = Offset.zero;
+                          const curve = Curves.easeInOut;
+
+                          var tween = Tween(begin: begin, end: end)
+                              .chain(CurveTween(curve: curve));
+
+                          return SlideTransition(
+                            position: animation.drive(tween),
+                            child: child,
+                          );
+                        },
+                      ),
+                    );
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.symmetric(horizontal: 25, vertical: 10),
+                  decoration: BoxDecoration(
+                      color: AppColors.white.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Text(
+                    '詳細を見る',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
