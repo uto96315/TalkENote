@@ -16,12 +16,17 @@ class HomeTabPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.listen(homeViewModelProvider, (prev, next) {
-      final msg = next.errorMessage;
-      if (msg != null && msg.isNotEmpty) {
+      final prevMsg = prev?.errorMessage;
+      final nextMsg = next.errorMessage;
+      // エラーメッセージが新しく設定された場合のみ処理（無限ループを防ぐ）
+      if (nextMsg != null && nextMsg.isNotEmpty && prevMsg != nextMsg) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(msg)),
+          SnackBar(content: Text(nextMsg)),
         );
-        ref.read(homeViewModelProvider.notifier).clearError();
+        // エラーをクリアするのは、次のフレームで実行（無限ループを防ぐ）
+        Future.microtask(() {
+          ref.read(homeViewModelProvider.notifier).clearError();
+        });
       }
     });
 
