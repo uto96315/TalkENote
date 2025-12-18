@@ -399,13 +399,8 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
           genreHint: s.genre,
           allowedSegments: kAllowedSegments,
         );
-        final selectedSentences = res.selected.isNotEmpty
-            ? res.selected
-            : res.suggestions
-                .map((m) => m['en'])
-                .whereType<String>()
-                .where((e) => e.isNotEmpty)
-                .toList();
+        // selectedが空の場合は空のリストを設定（デフォルトは選択なし）
+        final selectedSentences = res.selected;
 
         // 全体翻訳から該当センテンスの日本語訳を抽出（簡易版：最初のセンテンスから順に割り当て）
         // TODO: より精密なマッピングが必要な場合は、AIに分割してもらう

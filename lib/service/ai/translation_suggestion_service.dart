@@ -208,7 +208,7 @@ class TranslationSuggestionService {
               '  Each suggestion should be a complete, natural English sentence that conveys the same meaning. '
               '  Suggestions should match the length and detail level of the original sentence. '
               '  Use appropriate subjects (we, I, they, etc.) based on context. '
-              '- selected: array of one or more "en" strings chosen from suggestions (the best translation) '
+              '- selected: (OPTIONAL) array of "en" strings chosen from suggestions. If no selection should be made by default, return an empty array []. Only include translations that should be pre-selected. '
               '- genre: short snake_case genre key (e.g., acknowledgement_agreement) '
               '- segment: $segmentConstraint '
               '- phrases: array of objects [{ "phrase": "...", "ja": "..." }] containing useful phrases, idioms, or common expressions from the sentence. '
@@ -223,7 +223,7 @@ class TranslationSuggestionService {
               'suggestions length should be $suggestionCount. '
               'Each suggestion must be a complete, natural English sentence that matches the length and detail level of the original. '
               'Use appropriate subjects based on context (we, I, they, etc.). '
-              'selected should be a subset of the "en" values in suggestions (choose the best translation). '
+              'selected should be an empty array [] by default. Only include translations in selected if they should be pre-selected. '
               'The Japanese translation (ja) must also match the length and detail level of the original English sentence. '
               'phrases should contain useful phrases/expressions from the sentence with Japanese translations.',
         },
@@ -279,10 +279,8 @@ class TranslationSuggestionService {
             .whereType<Map<String, String>>()
             .toList() ??
         const [];
-    final selected = (parsed['selected'] as List<dynamic>?)
-            ?.map((e) => e.toString())
-            .toList() ??
-        const [];
+    // selectedはデフォルトで空の配列（AIが返しても無視）
+    final selected = const <String>[];
     final genre = parsed['genre']?.toString();
     var segment = parsed['segment']?.toString();
     if (segment == null ||
