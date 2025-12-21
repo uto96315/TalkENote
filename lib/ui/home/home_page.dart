@@ -8,7 +8,7 @@ import '../../constants/user_plan.dart';
 import '../../provider/home_provider.dart';
 import '../../provider/plan_provider.dart';
 import '../../provider/recording_provider.dart';
-import 'widgets/home_tab.dart';
+import 'widgets/home_tab.dart' show RecordTabPage;
 import 'widgets/recordings_list.dart';
 
 final currentTabProvider = StateProvider<HomeTab>((ref) => HomeTab.home);
@@ -48,7 +48,12 @@ class _HomePageState extends ConsumerState<HomePage> {
       extendBody: true,
       body: IndexedStack(
         index: tabs.indexOf(tab),
-        children: const [HomeTabPage(), _NoteTabPage(), _AccountTabPage()],
+        children: const [
+          _HomeTabPage(),
+          RecordTabPage(),
+          _NoteTabPage(),
+          _AccountTabPage(),
+        ],
       ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
@@ -61,7 +66,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               _playTabSound();
             }
             notifier.state = next;
-            if (next == HomeTab.home) {
+            if (next == HomeTab.record) {
               ref.read(homeViewModelProvider.notifier).refreshFiles();
             } else if (next == HomeTab.note) {
               ref.read(recordingsReloadTickProvider.notifier).state++;
@@ -166,6 +171,63 @@ class _FloatingNavBar extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+class _HomeTabPage extends ConsumerWidget {
+  const _HomeTabPage();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _GradientPage(
+      child: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ホーム',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(height: 32),
+              // TODO: ユーザーの保存回数や単語数などを表示
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.textSecondary.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: const Column(
+                  children: [
+                    Text(
+                      '統計情報',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      '準備中...',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

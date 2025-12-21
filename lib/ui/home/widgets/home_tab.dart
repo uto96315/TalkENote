@@ -7,8 +7,8 @@ import '../../../provider/recording_provider.dart';
 import '../../../provider/auth_provider.dart';
 import '../recording_detail_page.dart';
 
-class HomeTabPage extends ConsumerWidget {
-  const HomeTabPage({super.key});
+class RecordTabPage extends ConsumerWidget {
+  const RecordTabPage({super.key});
 
   String _formatElapsed(Duration d) {
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
