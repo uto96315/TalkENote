@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:talkenote/constants/app_colors.dart';
 
-import '../../constants/upload_status.dart';
 import '../../data/model/recording.dart';
 import '../../data/model/sentence.dart';
 import '../../provider/ai_provider.dart';
