@@ -1,1 +1,34 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"talk-e-note-firebase","appId":"1:507538173056:android:3016a6f8b9bd5a637eca65","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"talk-e-note-firebase","appId":"1:507538173056:ios:26d1ab42e0610ede7eca65","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"talk-e-note-firebase","configurations":{"android":"1:507538173056:android:3016a6f8b9bd5a637eca65","ios":"1:507538173056:ios:26d1ab42e0610ede7eca65"}}}}}}
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "talk-e-note-firebase",
+          "appId": "1:507538173056:android:3016a6f8b9bd5a637eca65",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "ios": {
+        "default": {
+          "projectId": "talk-e-note-firebase",
+          "appId": "1:507538173056:ios:26d1ab42e0610ede7eca65",
+          "uploadDebugSymbols": false,
+          "fileOutput": "ios/Runner/GoogleService-Info.plist"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "talk-e-note-firebase",
+          "configurations": {
+            "android": "1:507538173056:android:3016a6f8b9bd5a637eca65",
+            "ios": "1:507538173056:ios:26d1ab42e0610ede7eca65"
+          }
+        }
+      }
+    }
+  }
+}

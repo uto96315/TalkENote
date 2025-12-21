@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../constants/transcript_status.dart';
+import '../constants/user_plan.dart';
 import '../service/audio/audio_file_repository.dart';
 import '../service/audio/record_audio_service.dart';
 import '../service/ai/transcription_service.dart';
@@ -17,9 +18,11 @@ import '../service/ai/sentence_splitter_service.dart';
 import '../service/ai/translation_suggestion_service.dart';
 import '../data/repository/recording_repository.dart';
 import '../data/repository/auth_repository.dart';
+import '../data/repository/user_repository.dart';
 import '../provider/ai_provider.dart';
 import '../provider/auth_provider.dart';
 import '../provider/recording_provider.dart';
+import '../provider/user_provider.dart';
 import '../constants/upload_status.dart';
 import '../data/model/sentence.dart';
 
@@ -77,12 +80,11 @@ final homeViewModelProvider =
 class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   HomeViewModel() : super();
 
-  static const _maxRecordingDuration = Duration(minutes: 1);
-
   final _audioRepo = AudioFileRepository();
   final _recordService = RecordAudioService();
   late final RecordingRepository _recordingRepo;
   late final AuthRepository _authRepo;
+  late final UserRepository _userRepo;
   late final TranscriptionService _transcription;
   late final SentenceSplitterService _splitter;
   late final TranslationSuggestionService _translator;
@@ -91,11 +93,13 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
   Timer? _autoStopTimer;
   Timer? _elapsedTimer;
   DateTime? _recordingStartedAt;
+  UserPlan? _currentPlan;
 
   @override
   HomeState build() {
     _recordingRepo = ref.read(recordingRepositoryProvider);
     _authRepo = ref.read(authRepositoryProvider);
+    _userRepo = ref.read(userRepositoryProvider);
     _transcription = ref.read(transcriptionServiceProvider);
     _splitter = ref.read(sentenceSplitterServiceProvider);
     _translator = ref.read(translationSuggestionServiceProvider);
@@ -104,13 +108,59 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       _elapsedTimer?.cancel();
       _soundPlayer.dispose();
     });
-    Future.microtask(_loadFiles); // 非同期に初回ロードを開始
+    Future.microtask(() async {
+      await _loadUserPlan();
+      _loadFiles();
+    }); // 非同期に初回ロードを開始
     return const HomeState(isLoading: true);
+  }
+
+  /// ユーザーのプランを読み込む
+  Future<void> _loadUserPlan() async {
+    final user = _authRepo.currentUser;
+    if (user != null) {
+      _currentPlan = await _userRepo.getUserPlan(user.uid);
+    } else {
+      _currentPlan = UserPlan.free; // デフォルトは無課金
+    }
+  }
+
+  /// プランに応じた最大録音時間を取得
+  Duration _getMaxRecordingDuration() {
+    if (_currentPlan == null) {
+      return PlanLimits.forPlan(UserPlan.free).maxRecordingDuration;
+    }
+    return PlanLimits.forPlan(_currentPlan!).maxRecordingDuration;
   }
 
   Future<void> toggleRecording() async {
     if (state.isRecording) {
       await _stopRecording();
+      return;
+    }
+
+    // プラン制限をチェック
+    final user = _authRepo.currentUser;
+    if (user == null) {
+      state = state.copyWith(
+        errorMessage: 'ログインが必要です',
+      );
+      return;
+    }
+
+    // プランが読み込まれていない場合は読み込む
+    if (_currentPlan == null) {
+      await _loadUserPlan();
+    }
+
+    // 月間録音回数をチェック
+    final monthlyCount = await _userRepo.getMonthlyRecordingCount(user.uid);
+    final limits = PlanLimits.forPlan(_currentPlan ?? UserPlan.free);
+    if (monthlyCount >= limits.monthlyRecordingLimit) {
+      state = state.copyWith(
+        errorMessage:
+            '今月の録音回数上限（${limits.monthlyRecordingLimit}回）に達しています。プランをアップグレードしてください。',
+      );
       return;
     }
 
@@ -170,7 +220,8 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
 
   void _scheduleAutoStop() {
     _autoStopTimer?.cancel();
-    _autoStopTimer = Timer(_maxRecordingDuration, () {
+    final maxDuration = _getMaxRecordingDuration();
+    _autoStopTimer = Timer(maxDuration, () {
       _stopRecording();
     });
   }
