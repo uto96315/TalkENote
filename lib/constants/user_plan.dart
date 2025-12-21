@@ -1,6 +1,6 @@
 /// ユーザープラン定義
 enum UserPlan {
-  /// 無課金（フリー）
+  /// 通常ユーザー（フリー）
   free,
 
   /// 課金
@@ -55,11 +55,11 @@ class PlanLimits {
   static String planName(UserPlan plan) {
     switch (plan) {
       case UserPlan.free:
-        return '無課金';
+        return '通常プラン';
       case UserPlan.paid:
-        return '課金';
+        return 'プレミアムプラン';
       case UserPlan.premiumPlus:
-        return 'プレミアム+';
+        return 'プレミアムプラン+';
     }
   }
 }

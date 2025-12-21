@@ -193,41 +193,49 @@ class _AccountTabPage extends ConsumerWidget {
 
     return _GradientPage(
       child: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'アカウント',
-                style: TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'アカウント',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 32),
+                    // プラン情報
+                    planAsync.when(
+                      data: (plan) => _PlanCard(
+                        plan: plan,
+                        limits: limitsAsync,
+                        monthlyCount: monthlyCountAsync.when(
+                          data: (count) => count,
+                          loading: () => 0,
+                          error: (_, __) => 0,
+                        ),
+                      ),
+                      loading: () => const Center(
+                        child: CircularProgressIndicator(color: Colors.white),
+                      ),
+                      error: (error, _) => Text(
+                        'エラー: $error',
+                        style: const TextStyle(color: Colors.white),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 32),
-              // プラン情報
-              planAsync.when(
-                data: (plan) => _PlanCard(
-                  plan: plan,
-                  limits: limitsAsync,
-                  monthlyCount: monthlyCountAsync.when(
-                    data: (count) => count,
-                    loading: () => 0,
-                    error: (_, __) => 0,
-                  ),
-                ),
-                loading: () => const Center(
-                  child: CircularProgressIndicator(color: Colors.white),
-                ),
-                error: (error, _) => Text(
-                  'エラー: $error',
-                  style: const TextStyle(color: Colors.white),
-                ),
-              ),
-            ],
-          ),
+            ),
+            // ボトムナビゲーションのスペースを確保
+            const SizedBox(height: 96),
+          ],
         ),
       ),
     );
@@ -250,7 +258,7 @@ class _PlanCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.2),
+        color: AppColors.textSecondary.withValues(alpha: 0.2),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -273,7 +281,7 @@ class _PlanCard extends StatelessWidget {
                   vertical: 6,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.3),
+                  color: Colors.white.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -361,7 +369,8 @@ class _PlanInfoRow extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 14,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
           ),
         ),
         const Spacer(),
@@ -385,11 +394,13 @@ class _GradientPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: AppColors.homeGradient,
+    return SizedBox.expand(
+      child: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.homeGradient,
+        ),
+        child: child,
       ),
-      child: child,
     );
   }
 }

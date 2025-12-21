@@ -46,7 +46,7 @@ class UserRepository {
     try {
       final snapshot = await userRef(uid).get();
       if (!snapshot.exists) {
-        return UserPlan.free; // デフォルトは無課金
+        return UserPlan.free; // デフォルトは通常ユーザー
       }
       final data = snapshot.data();
       final planStr = data?['plan'] as String?;
