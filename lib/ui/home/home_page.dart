@@ -239,8 +239,31 @@ class _NoteTabPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _GradientPage(
-      child: SafeArea(child: RecordingsList()),
+    return _GradientPage(
+      child: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 16),
+              child: Row(
+                children: [
+                  const Text(
+                    '記録',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Expanded(child: RecordingsList()),
+            // ボトムナビゲーションのスペースを確保
+            const SizedBox(height: 96),
+          ],
+        ),
+      ),
     );
   }
 }

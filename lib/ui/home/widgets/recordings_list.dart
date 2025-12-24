@@ -74,7 +74,7 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
     return RefreshIndicator(
       onRefresh: _load,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         child: Column(
           children: [
             if (_isLoading) const LinearProgressIndicator(),
