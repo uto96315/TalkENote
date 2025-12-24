@@ -20,6 +20,7 @@ import '../data/repository/auth_repository.dart';
 import '../data/repository/user_repository.dart';
 import '../provider/ai_provider.dart';
 import '../provider/auth_provider.dart';
+import '../provider/plan_provider.dart';
 import '../provider/recording_provider.dart';
 import '../provider/user_provider.dart';
 import '../constants/upload_status.dart';
@@ -273,6 +274,15 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
         newWords: const [],
         status: UploadStatus.uploaded,
       );
+      
+      // 月間録音回数をインクリメント
+      final newCount = await _userRepo.incrementMonthlyRecordingCount(user.uid);
+      if (newCount == -1) {
+        debugPrint('⚠️Failed to increment monthly recording count, but continuing with recording save');
+      }
+      
+      // プロバイダーをリフレッシュしてUIを更新
+      ref.invalidate(monthlyRecordingCountProvider);
 
       // 音声バイトを渡して同期的にパイプラインを実行
       final Uint8List bytes = await File(path).readAsBytes();

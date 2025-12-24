@@ -5,6 +5,7 @@ import '../../../constants/app_colors.dart';
 import '../../../provider/home_provider.dart';
 import '../../../provider/recording_provider.dart';
 import '../../../provider/auth_provider.dart';
+import '../../../provider/plan_provider.dart';
 import '../../../utils/snackbar_utils.dart';
 import '../recording_detail_page.dart';
 
@@ -15,6 +16,13 @@ class RecordTabPage extends ConsumerWidget {
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$minutes:$seconds';
+  }
+
+  String _formatDuration(Duration d) {
+    if (d.inHours > 0) {
+      return '${d.inHours}:${(d.inMinutes % 60).toString().padLeft(2, '0')}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
+    }
+    return '${d.inMinutes}:${(d.inSeconds % 60).toString().padLeft(2, '0')}';
   }
 
   @override
@@ -36,6 +44,15 @@ class RecordTabPage extends ConsumerWidget {
     final vm = ref.read(homeViewModelProvider.notifier);
     final isRecording = state.isRecording;
     final elapsedText = _formatElapsed(state.recordingElapsed);
+    final limits = ref.watch(userPlanLimitsProvider);
+    final monthlyCountAsync = ref.watch(monthlyRecordingCountProvider);
+    final maxDuration = limits.maxRecordingDuration;
+    
+    // 残り時間を計算
+    Duration? remainingTime;
+    if (isRecording && state.recordingElapsed < maxDuration) {
+      remainingTime = maxDuration - state.recordingElapsed;
+    }
 
     return Container(
       width: double.infinity,
@@ -67,6 +84,7 @@ class RecordTabPage extends ConsumerWidget {
               onTap: () => vm.toggleRecording(),
             ),
             const SizedBox(height: 24),
+            // 経過時間の表示
             Text(
               elapsedText,
               style: Theme.of(context).textTheme.displaySmall?.copyWith(
@@ -75,11 +93,59 @@ class RecordTabPage extends ConsumerWidget {
                   ),
             ),
             const SizedBox(height: 10),
-            Text(
-              isRecording ? 'Auto stop at 01:00' : 'Auto stop after 01:00',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white,
-                  ),
+            // プラン制限の表示
+            if (isRecording && remainingTime != null) ...[
+              // 録音中：残り時間を表示
+              Text(
+                '残り ${_formatDuration(remainingTime)} で自動停止',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: remainingTime.inSeconds <= 10
+                          ? Colors.red[300]
+                          : remainingTime.inSeconds <= 30
+                              ? Colors.orange[300]
+                              : Colors.white,
+                      fontWeight: remainingTime.inSeconds <= 30
+                          ? FontWeight.w600
+                          : FontWeight.normal,
+                    ),
+              ),
+            ] else ...[
+              // 録音停止中：最大録音時間を表示
+              Text(
+                '最大録音時間: ${_formatDuration(maxDuration)}',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Colors.white.withOpacity(0.8),
+                    ),
+              ),
+            ],
+            // 月間録音回数の表示
+            monthlyCountAsync.when(
+              data: (count) {
+                final limit = limits.monthlyRecordingLimit;
+                final isNearLimit = count >= limit * 0.8; // 80%以上で警告
+                final isAtLimit = count >= limit;
+                if (count > 0 || isNearLimit) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Text(
+                      '今月の録音: $count/$limit 回${isAtLimit ? ' (上限到達)' : isNearLimit ? ' (残り${limit - count}回)' : ''}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isAtLimit
+                                ? Colors.red[300]
+                                : isNearLimit
+                                    ? Colors.orange[300]
+                                    : Colors.white.withOpacity(0.7),
+                            fontWeight: isAtLimit || isNearLimit
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, __) => const SizedBox.shrink(),
             ),
             if (state.progressMessage != null ||
                 state.completedRecordingId != null) ...[
