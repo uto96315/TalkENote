@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/app_colors.dart';
+import '../../../constants/home_tab.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/plan_provider.dart';
 import '../../../provider/user_provider.dart';
@@ -8,6 +9,9 @@ import '../../../utils/snackbar_utils.dart';
 import '../../auth/signin_page.dart';
 import '../../auth/signup_page.dart';
 import '../../contact/contact_page.dart';
+import '../../widgets/confirm_dialog.dart';
+import '../../../app/routes.dart';
+import '../home_page.dart' show currentTabProvider;
 import '../widgets/account_sidebar.dart';
 import '../widgets/gradient_page.dart';
 import '../widgets/plan_card.dart';
@@ -255,6 +259,20 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                   },
                   onLogout: () async {
                     _closeSidebar();
+                    // 確認ダイアログを表示
+                    final confirmed = await showConfirmDialog(
+                      context: context,
+                      title: 'ログアウト',
+                      message: 'ログアウトしてもよろしいですか？',
+                      confirmText: 'ログアウト',
+                      cancelText: 'キャンセル',
+                      isDestructive: true,
+                    );
+                    
+                    if (confirmed != true) {
+                      return; // キャンセルされた場合は処理を中断
+                    }
+                    
                     final authRepo = ref.read(authRepositoryProvider);
                     final userRepo = ref.read(userRepositoryProvider);
                     try {
@@ -268,8 +286,23 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                           isAnonymous: true,
                         );
                       }
+                      
                       if (mounted) {
-                        SnackBarUtils.show(context, 'ログアウトしました');
+                        // タブをホームにリセット
+                        ref.read(currentTabProvider.notifier).state = HomeTab.home;
+                        
+                        // ナビゲーションスタックをクリアしてホーム画面に戻る
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                          AppRoutes.home,
+                          (route) => false, // すべてのルートを削除
+                        );
+                        
+                        // 少し遅延してからスナックバーを表示（ナビゲーション完了後）
+                        Future.delayed(const Duration(milliseconds: 300), () {
+                          if (mounted) {
+                            SnackBarUtils.show(context, 'ログアウトしました');
+                          }
+                        });
                       }
                     } catch (e) {
                       if (mounted) {
