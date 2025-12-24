@@ -5,6 +5,7 @@ import '../../../constants/app_colors.dart';
 import '../../../provider/home_provider.dart';
 import '../../../provider/recording_provider.dart';
 import '../../../provider/auth_provider.dart';
+import '../../../utils/snackbar_utils.dart';
 import '../recording_detail_page.dart';
 
 class RecordTabPage extends ConsumerWidget {
@@ -23,24 +24,7 @@ class RecordTabPage extends ConsumerWidget {
       final nextMsg = next.errorMessage;
       // エラーメッセージが新しく設定された場合のみ処理（無限ループを防ぐ）
       if (nextMsg != null && nextMsg.isNotEmpty && prevMsg != nextMsg) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              nextMsg,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            backgroundColor: AppColors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-            elevation: 8,
-          ),
-        );
+        SnackBarUtils.show(context, nextMsg);
         // エラーをクリアするのは、次のフレームで実行（無限ループを防ぐ）
         Future.microtask(() {
           ref.read(homeViewModelProvider.notifier).clearError();

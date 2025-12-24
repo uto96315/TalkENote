@@ -8,6 +8,7 @@ import '../../constants/user_plan.dart';
 import '../../provider/home_provider.dart';
 import '../../provider/plan_provider.dart';
 import '../../provider/recording_provider.dart';
+import '../../utils/snackbar_utils.dart';
 import 'widgets/home_tab.dart' show RecordTabPage;
 import 'widgets/recordings_list.dart';
 
@@ -377,11 +378,7 @@ class _PlanCard extends StatelessWidget {
             ElevatedButton(
               onPressed: () {
                 // TODO: プランアップグレード画面への遷移
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('プランアップグレード機能は準備中です'),
-                  ),
-                );
+                SnackBarUtils.show(context, 'プランアップグレード機能は準備中です');
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,

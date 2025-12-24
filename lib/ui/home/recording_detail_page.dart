@@ -11,6 +11,7 @@ import '../../provider/ai_provider.dart';
 import '../../service/ai/translation_suggestion_service.dart';
 import '../../provider/recording_provider.dart';
 import '../../constants/transcript_status.dart';
+import '../../utils/snackbar_utils.dart';
 
 class RecordingDetailPage extends ConsumerStatefulWidget {
   const RecordingDetailPage({super.key, required this.recording});
@@ -286,9 +287,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存に失敗しました: $e')),
-        );
+        SnackBarUtils.show(context, '保存に失敗しました: $e');
       }
     }
   }
@@ -302,9 +301,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存に失敗しました: $e')),
-        );
+        SnackBarUtils.show(context, '保存に失敗しました: $e');
       }
     }
   }
@@ -328,13 +325,10 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
   }
 
   Future<void> _onTranscribe() async {
-    final scaffold = ScaffoldMessenger.of(context);
     final repo = ref.read(recordingRepositoryProvider);
     final transcription = ref.read(transcriptionServiceProvider);
     if (!transcription.isConfigured) {
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('OpenAI APIキーが設定されていません (.env)')),
-      );
+      SnackBarUtils.show(context, 'OpenAI APIキーが設定されていません (.env)');
       return;
     }
     _log('Transcribe 🎙️: start (id=${_recording.id})');
@@ -372,18 +366,14 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
       });
       _log('Transcribe 🎙️: state -> done ✅ (local)');
       success = true;
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('文字起こしが完了しました')),
-      );
+      SnackBarUtils.show(context, '文字起こしが完了しました');
     } catch (e) {
       _log('Transcribe 🎙️: failed ❌ $e');
       await repo.updateTranscriptStatus(
         recordingId: _recording.id,
         status: TranscriptStatus.failed,
       );
-      scaffold.showSnackBar(
-        SnackBar(content: Text('文字起こしに失敗しました: $e')),
-      );
+      SnackBarUtils.show(context, '文字起こしに失敗しました: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -397,21 +387,16 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
   }
 
   Future<void> _onSplitSentences() async {
-    final scaffold = ScaffoldMessenger.of(context);
     final splitter = ref.read(sentenceSplitterServiceProvider);
     final repo = ref.read(recordingRepositoryProvider);
     final raw = _recording.transcriptRaw?.trim() ?? '';
 
     if (raw.isEmpty) {
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('先に文字起こしを実行してください')),
-      );
+      SnackBarUtils.show(context, '先に文字起こしを実行してください');
       return;
     }
     if (!splitter.isConfigured) {
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('OpenAI APIキーが設定されていません (.env)')),
-      );
+      SnackBarUtils.show(context, 'OpenAI APIキーが設定されていません (.env)');
       return;
     }
     _log('Split ✂️: start (id=${_recording.id})');
@@ -430,21 +415,16 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
         _recording = _recording.copyWith(sentences: sentences);
       });
       _log('Split ✂️: state updated ✅');
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('文分割が完了しました')),
-      );
+      SnackBarUtils.show(context, '文分割が完了しました');
     } catch (e) {
       _log('Split ✂️: failed ❌ $e');
-      scaffold.showSnackBar(
-        SnackBar(content: Text('文分割に失敗しました: $e')),
-      );
+      SnackBarUtils.show(context, '文分割に失敗しました: $e');
     } finally {
       if (mounted) setState(() => _splitting = false);
     }
   }
 
   Future<void> _editSentence(Sentence sentence) async {
-    final scaffold = ScaffoldMessenger.of(context);
     final repo = ref.read(recordingRepositoryProvider);
     final ctrl = TextEditingController(text: sentence.text);
     String? updatedText;
@@ -481,9 +461,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
     }
     if (updatedText == null) return;
     if (updatedText.isEmpty) {
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('空の文は保存できません')),
-      );
+      SnackBarUtils.show(context, '空の文は保存できません');
       return;
     }
 
@@ -500,31 +478,22 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
       setState(() {
         _recording = _recording.copyWith(sentences: newSentences);
       });
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('更新しました')),
-      );
+      SnackBarUtils.show(context, '更新しました');
     } catch (e) {
-      scaffold.showSnackBar(
-        SnackBar(content: Text('更新に失敗しました: $e')),
-      );
+      SnackBarUtils.show(context, '更新に失敗しました: $e');
     }
   }
 
   Future<void> _onGenerateTranslations() async {
-    final scaffold = ScaffoldMessenger.of(context);
     final translator = ref.read(translationSuggestionServiceProvider);
     final repo = ref.read(recordingRepositoryProvider);
 
     if (!translator.isConfigured) {
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('OpenAI APIキーが設定されていません (.env)')),
-      );
+      SnackBarUtils.show(context, 'OpenAI APIキーが設定されていません (.env)');
       return;
     }
     if (_recording.sentences.isEmpty) {
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('先に文分割を実行してください')),
-      );
+      SnackBarUtils.show(context, '先に文分割を実行してください');
       return;
     }
 
@@ -561,13 +530,9 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
       setState(() {
         _recording = _recording.copyWith(sentences: updated);
       });
-      scaffold.showSnackBar(
-        const SnackBar(content: Text('翻訳候補を生成しました')),
-      );
+      SnackBarUtils.show(context, '翻訳候補を生成しました');
     } catch (e) {
-      scaffold.showSnackBar(
-        SnackBar(content: Text('翻訳候補の生成に失敗しました: $e')),
-      );
+      SnackBarUtils.show(context, '翻訳候補の生成に失敗しました: $e');
     } finally {
       if (mounted) setState(() => _translating = false);
     }
