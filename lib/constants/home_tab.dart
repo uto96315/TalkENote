@@ -23,7 +23,7 @@ extension HomeTabX on HomeTab {
       case HomeTab.record:
         return Icons.add_circle_outline;
       case HomeTab.note:
-        return Icons.note_alt_outlined;
+        return Icons.description;
       case HomeTab.account:
         return Icons.person_outline;
     }
