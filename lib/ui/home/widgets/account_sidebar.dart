@@ -7,13 +7,19 @@ class AccountSidebar extends StatelessWidget {
     required this.onClose,
     required this.onAccountInfo,
     required this.onLogout,
+    required this.onLogin,
     required this.onContact,
+    this.email,
+    this.isAnonymous = false,
   });
 
   final VoidCallback onClose;
   final VoidCallback onAccountInfo;
   final VoidCallback onLogout;
+  final VoidCallback onLogin;
   final VoidCallback onContact;
+  final String? email;
+  final bool isAnonymous;
 
   @override
   Widget build(BuildContext context) {
@@ -46,34 +52,20 @@ class AccountSidebar extends StatelessWidget {
               // ヘッダー
               Padding(
                 padding: const EdgeInsets.fromLTRB(24, 20, 16, 20),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'メニュー',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    InkWell(
-                      onTap: onClose,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.textSecondary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Icon(
-                          Icons.close_rounded,
+                    if (email != null && email!.isNotEmpty) ...[
+                      const SizedBox(height: 12),
+                      Text(
+                        email!,
+                        style: TextStyle(
+                          fontSize: 15,
                           color: AppColors.textSecondary,
-                          size: 20,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
               ),
@@ -82,24 +74,27 @@ class AccountSidebar extends StatelessWidget {
                 child: ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    SidebarMenuItem(
-                      icon: Icons.person_outline_rounded,
-                      text: 'アカウント情報',
-                      onTap: onAccountInfo,
-                    ),
-                    const SizedBox(height: 8),
-                    SidebarMenuItem(
-                      icon: Icons.logout_rounded,
-                      text: 'ログアウト',
-                      onTap: onLogout,
-                      isDestructive: true,
-                    ),
-                    const SizedBox(height: 8),
+                    // SidebarMenuItem(
+                    //   icon: Icons.person_outline_rounded,
+                    //   text: 'アカウント情報',
+                    //   onTap: onAccountInfo,
+                    // ),
                     SidebarMenuItem(
                       icon: Icons.help_outline_rounded,
                       text: 'お問い合わせ',
                       onTap: onContact,
                     ),
+                    const SizedBox(height: 8),
+                    SidebarMenuItem(
+                      icon: isAnonymous
+                          ? Icons.login_rounded
+                          : Icons.logout_rounded,
+                      text: isAnonymous ? 'ログイン' : 'ログアウト',
+                      onTap: isAnonymous ? onLogin : onLogout,
+                      isDestructive: !isAnonymous,
+                    ),
+                    const SizedBox(height: 8),
+                    
                   ],
                 ),
               ),
@@ -180,4 +175,3 @@ class SidebarMenuItem extends StatelessWidget {
     );
   }
 }
-

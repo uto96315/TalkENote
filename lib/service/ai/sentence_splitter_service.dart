@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class SentenceSplitterService {
@@ -10,6 +13,7 @@ class SentenceSplitterService {
 
   final String? apiKey;
   final http.Client _client;
+  static const Duration _timeout = Duration(seconds: 30);
 
   bool get isConfigured => apiKey != null && apiKey!.isNotEmpty;
 
@@ -37,26 +41,45 @@ class SentenceSplitterService {
       ],
     };
 
-    final resp = await _client.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
-    if (resp.statusCode != 200) {
-      throw Exception('Sentence split failed: ${resp.body}');
+    try {
+      final resp = await _client
+          .post(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $apiKey',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout, onTimeout: () {
+        throw TimeoutException('Request timeout: Sentence split request timed out');
+      });
+      if (resp.statusCode != 200) {
+        throw Exception('Sentence split failed: ${resp.body}');
+      }
+      final data = jsonDecode(resp.body) as Map<String, dynamic>;
+      final choices = data['choices'] as List<dynamic>? ?? [];
+      if (choices.isEmpty) {
+        throw Exception('No choices returned from splitter');
+      }
+      final content = (choices.first['message']
+              as Map<String, dynamic>?)?['content'] as String? ??
+          '';
+      return _extractSentences(content);
+    } on SocketException catch (e) {
+      debugPrint('Network error: $e');
+      throw Exception(
+          'Network error: Unable to connect. Please check your internet connection.');
+    } on TimeoutException catch (e) {
+      debugPrint('Timeout error: $e');
+      throw Exception('Request timeout: Please try again.');
+    } on HttpException catch (e) {
+      debugPrint('HTTP error: $e');
+      throw Exception('HTTP error: ${e.message}');
+    } catch (e) {
+      debugPrint('Unexpected error: $e');
+      rethrow;
     }
-    final data = jsonDecode(resp.body) as Map<String, dynamic>;
-    final choices = data['choices'] as List<dynamic>? ?? [];
-    if (choices.isEmpty) {
-      throw Exception('No choices returned from splitter');
-    }
-    final content = (choices.first['message']
-            as Map<String, dynamic>?)?['content'] as String? ??
-        '';
-    return _extractSentences(content);
   }
 
   List<String> _extractSentences(String rawContent) {

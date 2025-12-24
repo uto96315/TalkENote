@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -93,6 +95,7 @@ class TranslationSuggestionService {
 
   final String? apiKey;
   final http.Client _client;
+  static const Duration _timeout = Duration(seconds: 30);
 
   bool get isConfigured => apiKey != null && apiKey!.isNotEmpty;
 
@@ -129,17 +132,22 @@ class TranslationSuggestionService {
       ],
     };
 
-    final resp = await _client.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
-    if (resp.statusCode != 200) {
-      throw Exception('Full translation failed: ${resp.body}');
-    }
+    try {
+      final resp = await _client
+          .post(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $apiKey',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout, onTimeout: () {
+        throw TimeoutException('Request timeout: Full translation request timed out');
+      });
+      if (resp.statusCode != 200) {
+        throw Exception('Full translation failed: ${resp.body}');
+      }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     final choices = data['choices'] as List<dynamic>? ?? [];
     if (choices.isEmpty) {
@@ -148,30 +156,44 @@ class TranslationSuggestionService {
     final content = (choices.first['message']
             as Map<String, dynamic>?)?['content'] as String? ??
         '{}';
-    final parsed = jsonDecode(content) as Map<String, dynamic>;
-    debugPrint('🔵 Full Translation Response:');
-    debugPrint('  ja: ${parsed['ja']}');
-    debugPrint('  phrases: ${parsed['phrases']}');
+      final parsed = jsonDecode(content) as Map<String, dynamic>;
+      debugPrint('🔵 Full Translation Response:');
+      debugPrint('  ja: ${parsed['ja']}');
+      debugPrint('  phrases: ${parsed['phrases']}');
 
-    final ja = parsed['ja']?.toString() ?? '';
-    final phrases = (parsed['phrases'] as List<dynamic>?)
-            ?.map((e) {
-              if (e is Map<String, dynamic>) {
-                return PhraseInfo.fromMap(e);
-              }
-              if (e is Map) {
-                return PhraseInfo.fromMap(Map<String, dynamic>.from(e));
-              }
-              return null;
-            })
-            .whereType<PhraseInfo>()
-            .toList() ??
-        const [];
-    debugPrint('🔵 Parsed phrases count: ${phrases.length}');
-    return FullTranslationResult(
-      ja: ja,
-      phrases: phrases,
-    );
+      final ja = parsed['ja']?.toString() ?? '';
+      final phrases = (parsed['phrases'] as List<dynamic>?)
+              ?.map((e) {
+                if (e is Map<String, dynamic>) {
+                  return PhraseInfo.fromMap(e);
+                }
+                if (e is Map) {
+                  return PhraseInfo.fromMap(Map<String, dynamic>.from(e));
+                }
+                return null;
+              })
+              .whereType<PhraseInfo>()
+              .toList() ??
+          const [];
+      debugPrint('🔵 Parsed phrases count: ${phrases.length}');
+      return FullTranslationResult(
+        ja: ja,
+        phrases: phrases,
+      );
+    } on SocketException catch (e) {
+      debugPrint('Network error: $e');
+      throw Exception(
+          'Network error: Unable to connect. Please check your internet connection.');
+    } on TimeoutException catch (e) {
+      debugPrint('Timeout error: $e');
+      throw Exception('Request timeout: Please try again.');
+    } on HttpException catch (e) {
+      debugPrint('HTTP error: $e');
+      throw Exception('HTTP error: ${e.message}');
+    } catch (e) {
+      debugPrint('Unexpected error: $e');
+      rethrow;
+    }
   }
 
   Future<TranslationSuggestionResult> generateSuggestions(
@@ -230,17 +252,22 @@ class TranslationSuggestionService {
       ],
     };
 
-    final resp = await _client.post(
-      uri,
-      headers: {
-        'Authorization': 'Bearer $apiKey',
-        'Content-Type': 'application/json',
-      },
-      body: jsonEncode(body),
-    );
-    if (resp.statusCode != 200) {
-      throw Exception('Translation suggestion failed: ${resp.body}');
-    }
+    try {
+      final resp = await _client
+          .post(
+            uri,
+            headers: {
+              'Authorization': 'Bearer $apiKey',
+              'Content-Type': 'application/json',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout, onTimeout: () {
+        throw TimeoutException('Request timeout: Translation suggestion request timed out');
+      });
+      if (resp.statusCode != 200) {
+        throw Exception('Translation suggestion failed: ${resp.body}');
+      }
     final data = jsonDecode(resp.body) as Map<String, dynamic>;
     final choices = data['choices'] as List<dynamic>? ?? [];
     if (choices.isEmpty) {
@@ -301,14 +328,28 @@ class TranslationSuggestionService {
             .whereType<PhraseInfo>()
             .toList() ??
         const [];
-    debugPrint('🟢 Parsed phrases count: ${phrases.length}');
-    return TranslationSuggestionResult(
-      ja: ja,
-      suggestions: suggestions,
-      selected: selected,
-      genre: genre,
-      segment: segment,
-      phrases: phrases,
-    );
+      debugPrint('🟢 Parsed phrases count: ${phrases.length}');
+      return TranslationSuggestionResult(
+        ja: ja,
+        suggestions: suggestions,
+        selected: selected,
+        genre: genre,
+        segment: segment,
+        phrases: phrases,
+      );
+    } on SocketException catch (e) {
+      debugPrint('Network error: $e');
+      throw Exception(
+          'Network error: Unable to connect. Please check your internet connection.');
+    } on TimeoutException catch (e) {
+      debugPrint('Timeout error: $e');
+      throw Exception('Request timeout: Please try again.');
+    } on HttpException catch (e) {
+      debugPrint('HTTP error: $e');
+      throw Exception('HTTP error: ${e.message}');
+    } catch (e) {
+      debugPrint('Unexpected error: $e');
+      rethrow;
+    }
   }
 }

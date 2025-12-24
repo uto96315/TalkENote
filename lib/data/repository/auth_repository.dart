@@ -42,7 +42,7 @@ class AuthRepository {
       final userCredential = await user.linkWithCredential(credential);
       return userCredential;
     } catch (e) {
-      debugPrint('メールアドレス登録に失敗: $e');
+      debugPrint('アカウントリンクに失敗: $e');
       rethrow;
     }
   }
@@ -60,6 +60,23 @@ class AuthRepository {
       return credential;
     } catch (e) {
       debugPrint('メールアドレス登録に失敗: $e');
+      rethrow;
+    }
+  }
+
+  /// メールアドレスとパスワードでログイン
+  Future<UserCredential?> signInWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return credential;
+    } catch (e) {
+      debugPrint('ログインに失敗: $e');
       rethrow;
     }
   }

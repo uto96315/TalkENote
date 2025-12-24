@@ -106,7 +106,7 @@ class PlanCard extends StatelessWidget {
 
   String _formatDuration(Duration duration) {
     final minutes = duration.inMinutes;
-    return '${minutes}分';
+    return '$minutes分';
   }
 }
 

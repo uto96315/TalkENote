@@ -13,15 +13,21 @@ class TalkENoteApp extends ConsumerWidget {
     final authRepo = ref.read(authRepositoryProvider);
     final userRepo = ref.read(userRepositoryProvider);
     // 🔑 起動時に匿名認証（1回だけ）
-    ref.read(authRepositoryProvider).signInAnonymouslyIfNeeded();
-
+    // Handle errors gracefully - don't block app startup
     authRepo.signInAnonymouslyIfNeeded().then((user) {
       if (user != null) {
         userRepo.createIfNotExists(
           uid: user.uid,
           isAnonymous: user.isAnonymous,
-        );
+        ).catchError((error) {
+          debugPrint('Failed to create user: $error');
+          // Continue even if user creation fails
+        });
       }
+    }).catchError((error) {
+      debugPrint('Failed to sign in anonymously: $error');
+      // Continue app initialization even if auth fails
+      return null; // Return null to satisfy the Future type
     });
 
     return MaterialApp(

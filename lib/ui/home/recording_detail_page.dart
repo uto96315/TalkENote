@@ -27,7 +27,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _memoCtrl;
   late Recording _recording;
-  bool _saving = false;
+  final bool _saving = false;
   bool _splitting = false;
   bool _translating = false;
   bool _isEditingTitle = false;

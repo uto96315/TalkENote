@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/app_colors.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/plan_provider.dart';
+import '../../../provider/user_provider.dart';
 import '../../../utils/snackbar_utils.dart';
+import '../../auth/signin_page.dart';
 import '../../auth/signup_page.dart';
+import '../../contact/contact_page.dart';
 import '../widgets/account_sidebar.dart';
 import '../widgets/gradient_page.dart';
 import '../widgets/plan_card.dart';
@@ -70,7 +73,14 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
     final limitsAsync = ref.watch(userPlanLimitsProvider);
     final monthlyCountAsync = ref.watch(monthlyRecordingCountProvider);
     final authRepo = ref.read(authRepositoryProvider);
-    final isAnonymous = authRepo.currentUser?.isAnonymous ?? false;
+    final userRepo = ref.read(userRepositoryProvider);
+    final currentUser = authRepo.currentUser;
+    final isAnonymous = currentUser?.isAnonymous ?? false;
+    
+    // メールアドレスを取得（非同期）
+    final emailFuture = currentUser != null
+        ? userRepo.getUserEmail(currentUser.uid)
+        : Future<String?>.value(null);
 
     return GradientPage(
       child: Stack(
@@ -224,29 +234,59 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
           // サイドバー
           SlideTransition(
             position: _slideAnimation,
-            child: AccountSidebar(
-              onClose: _closeSidebar,
-              onAccountInfo: () {
-                _closeSidebar();
-                // TODO: アカウント情報画面への遷移
-              },
-              onLogout: () async {
-                _closeSidebar();
-                final authRepo = ref.read(authRepositoryProvider);
-                try {
-                  await authRepo.signOut();
-                  if (mounted) {
-                    SnackBarUtils.show(context, 'ログアウトしました');
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    SnackBarUtils.show(context, 'ログアウトに失敗しました: $e');
-                  }
-                }
-              },
-              onContact: () {
-                _closeSidebar();
-                // TODO: お問い合わせ画面への遷移
+            child: FutureBuilder<String?>(
+              future: emailFuture,
+              builder: (context, emailSnapshot) {
+                return AccountSidebar(
+                  onClose: _closeSidebar,
+                  email: emailSnapshot.data,
+                  isAnonymous: isAnonymous,
+                  onAccountInfo: () {
+                    _closeSidebar();
+                    // TODO: アカウント情報画面への遷移
+                  },
+                  onLogin: () {
+                    _closeSidebar();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const SignInPage(),
+                      ),
+                    );
+                  },
+                  onLogout: () async {
+                    _closeSidebar();
+                    final authRepo = ref.read(authRepositoryProvider);
+                    final userRepo = ref.read(userRepositoryProvider);
+                    try {
+                      await authRepo.signOut();
+                      // ログアウト後、匿名ユーザーを再作成
+                      final anonymousUser =
+                          await authRepo.signInAnonymouslyIfNeeded();
+                      if (anonymousUser != null) {
+                        await userRepo.createIfNotExists(
+                          uid: anonymousUser.uid,
+                          isAnonymous: true,
+                        );
+                      }
+                      if (mounted) {
+                        SnackBarUtils.show(context, 'ログアウトしました');
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        SnackBarUtils.show(
+                            context, 'ログアウトに失敗しました: $e');
+                      }
+                    }
+                  },
+                  onContact: () {
+                    _closeSidebar();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ContactPage(),
+                      ),
+                    );
+                  },
+                );
               },
             ),
           ),

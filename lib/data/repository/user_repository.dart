@@ -36,9 +36,14 @@ class UserRepository {
   }
 
   Future<void> updateLastSeen(String uid) async {
-    await userRef(uid).update({
-      'lastSeenAt': FieldValue.serverTimestamp(),
-    });
+    try {
+      await userRef(uid).update({
+        'lastSeenAt': FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      debugPrint("🚨Error in updateLastSeen: $error");
+      // Silently fail - this is not critical for app functionality
+    }
   }
 
   /// ユーザーのプランを取得
@@ -103,6 +108,21 @@ class UserRepository {
     } catch (e) {
       debugPrint("🚨Error updating user info: $e");
       rethrow;
+    }
+  }
+
+  /// ユーザーのメールアドレスを取得
+  Future<String?> getUserEmail(String uid) async {
+    try {
+      final snapshot = await userRef(uid).get();
+      if (!snapshot.exists) {
+        return null;
+      }
+      final data = snapshot.data();
+      return data?['email'] as String?;
+    } catch (e) {
+      debugPrint("🚨Error getting user email: $e");
+      return null;
     }
   }
 

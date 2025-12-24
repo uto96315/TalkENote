@@ -30,6 +30,16 @@ service cloud.firestore {
       allow update: if request.auth != null && request.auth.uid == userId;
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
+    
+    // お問い合わせ
+    match /inquiries/{inquiryId} {
+      allow read: if request.auth != null && 
+                     resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && 
+                       request.resource.data.userId == request.auth.uid;
+      allow update: if false; // ユーザーは更新不可
+      allow delete: if false; // ユーザーは削除不可
+    }
   }
 }
 
