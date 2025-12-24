@@ -82,6 +82,30 @@ class UserRepository {
     }
   }
 
+  /// ユーザー情報を更新（メールアドレス登録時など）
+  Future<void> updateUserInfo({
+    required String uid,
+    String? email,
+    bool? isAnonymous,
+  }) async {
+    try {
+      final updateData = <String, dynamic>{};
+      if (email != null) {
+        updateData['email'] = email;
+      }
+      if (isAnonymous != null) {
+        updateData['isAnonymous'] = isAnonymous;
+      }
+      if (updateData.isEmpty) {
+        return; // 更新するデータがない場合は何もしない
+      }
+      await userRef(uid).update(updateData);
+    } catch (e) {
+      debugPrint("🚨Error updating user info: $e");
+      rethrow;
+    }
+  }
+
   /// 今月の録音回数を取得
   Future<int> getMonthlyRecordingCount(String uid) async {
     try {

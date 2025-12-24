@@ -63,4 +63,14 @@ class AuthRepository {
       rethrow;
     }
   }
+
+  /// ログアウト
+  Future<void> signOut() async {
+    try {
+      await _auth.signOut();
+    } catch (e) {
+      debugPrint('ログアウトに失敗: $e');
+      rethrow;
+    }
+  }
 }

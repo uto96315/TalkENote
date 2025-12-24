@@ -3,8 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../constants/app_colors.dart';
-import '../../data/repository/auth_repository.dart';
-import '../../data/repository/user_repository.dart';
 import '../../provider/auth_provider.dart';
 import '../../provider/user_provider.dart';
 import '../../utils/snackbar_utils.dart';
@@ -62,9 +60,19 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
       }
 
       if (userCredential?.user != null) {
+        final user = userCredential!.user!;
+        final email = _emailController.text.trim();
+
         // ユーザードキュメントを作成/更新
         await userRepo.createIfNotExists(
-          uid: userCredential!.user!.uid,
+          uid: user.uid,
+          isAnonymous: false,
+        );
+
+        // メールアドレスとisAnonymousを更新
+        await userRepo.updateUserInfo(
+          uid: user.uid,
+          email: email,
           isAnonymous: false,
         );
 
@@ -155,11 +163,11 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       textInputAction: TextInputAction.next,
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        labelText: 'メールアドレス',
+                        // labelText: 'メールアドレス',
                         labelStyle: const TextStyle(
                           color: AppColors.textSecondary,
                         ),
-                        hintText: 'example@email.com',
+                        hintText: 'メールアドレス',
                         hintStyle: const TextStyle(
                           color: AppColors.textSecondary,
                         ),
@@ -222,11 +230,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       textInputAction: TextInputAction.next,
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        labelText: 'パスワード',
-                        labelStyle: const TextStyle(
-                          color: AppColors.textSecondary,
-                        ),
-                        hintText: '8文字以上',
+                        hintText: 'パスワード（8文字以上）',
                         hintStyle: const TextStyle(
                           color: AppColors.textSecondary,
                         ),
@@ -302,11 +306,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                       onFieldSubmitted: (_) => _handleSignUp(),
                       style: const TextStyle(color: AppColors.textPrimary),
                       decoration: InputDecoration(
-                        labelText: 'パスワード（確認）',
-                        labelStyle: const TextStyle(
-                          color: AppColors.textSecondary,
-                        ),
-                        hintText: 'パスワードを再入力',
+                        hintText: 'パスワード（確認）',
                         hintStyle: const TextStyle(
                           color: AppColors.textSecondary,
                         ),
