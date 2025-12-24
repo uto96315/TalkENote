@@ -15,6 +15,7 @@ import '../service/audio/record_audio_service.dart';
 import '../service/ai/transcription_service.dart';
 import '../service/ai/sentence_splitter_service.dart';
 import '../service/ai/translation_suggestion_service.dart';
+import '../service/notification_service.dart';
 import '../data/repository/recording_repository.dart';
 import '../data/repository/auth_repository.dart';
 import '../data/repository/user_repository.dart';
@@ -507,6 +508,15 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
           completedRecordingId: recordingId,
         );
         print('Pipeline: completed recordingId=$recordingId');
+        
+        // 通知を表示（録音IDをpayloadとして含める）
+        try {
+          await NotificationService().showRecordingCompletedNotification(
+            recordingId: recordingId,
+          );
+        } catch (e) {
+          debugPrint('Failed to show notification: $e');
+        }
       } else {
         // エラー時は進捗メッセージのみクリア
         state = state.copyWith(progressMessage: null);

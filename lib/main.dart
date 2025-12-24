@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'app/app.dart';
 import 'firebase_options.dart';
+import 'service/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,9 +26,21 @@ void main() async {
     // The app can still function in offline mode
   }
 
+  // ProviderContainerを作成（通知サービスに渡すため）
+  final container = ProviderContainer();
+
+  // 通知サービスを初期化（ProviderContainerを渡して、通知タップ時にナビゲーションできるようにする）
+  try {
+    await NotificationService().initialize(container: container);
+  } catch (e) {
+    debugPrint('Error initializing notification service: $e');
+    // Continue app initialization even if notification service fails
+  }
+
   runApp(
-    const ProviderScope(
-      child: TalkENoteApp(),
+    UncontrolledProviderScope(
+      container: container,
+      child: const TalkENoteApp(),
     ),
   );
 }

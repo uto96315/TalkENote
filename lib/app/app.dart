@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:talkenote/provider/user_provider.dart';
 
 import '../provider/auth_provider.dart';
+import 'navigator_key.dart';
 import 'routes.dart';
 
 class TalkENoteApp extends ConsumerWidget {
@@ -31,6 +32,7 @@ class TalkENoteApp extends ConsumerWidget {
     });
 
     return MaterialApp(
+      navigatorKey: navigatorKey,
       title: 'TalkENote',
       routes: appRoutes,
       initialRoute: '/',
