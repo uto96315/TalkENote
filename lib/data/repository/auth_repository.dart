@@ -23,4 +23,44 @@ class AuthRepository {
   }
 
   User? get currentUser => _auth.currentUser;
+
+  /// 匿名ユーザーをメールアドレスで登録
+  Future<UserCredential?> linkWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null || !user.isAnonymous) {
+      throw Exception('匿名ユーザーではありません');
+    }
+
+    try {
+      final credential = EmailAuthProvider.credential(
+        email: email,
+        password: password,
+      );
+      final userCredential = await user.linkWithCredential(credential);
+      return userCredential;
+    } catch (e) {
+      debugPrint('メールアドレス登録に失敗: $e');
+      rethrow;
+    }
+  }
+
+  /// メールアドレスとパスワードでサインアップ
+  Future<UserCredential?> signUpWithEmail({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return credential;
+    } catch (e) {
+      debugPrint('メールアドレス登録に失敗: $e');
+      rethrow;
+    }
+  }
 }

@@ -8,7 +8,9 @@ import '../../constants/user_plan.dart';
 import '../../provider/home_provider.dart';
 import '../../provider/plan_provider.dart';
 import '../../provider/recording_provider.dart';
+import '../../provider/auth_provider.dart';
 import '../../utils/snackbar_utils.dart';
+import '../auth/signup_page.dart';
 import 'widgets/home_tab.dart' show RecordTabPage;
 import 'widgets/recordings_list.dart';
 
@@ -182,6 +184,9 @@ class _HomeTabPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authRepo = ref.read(authRepositoryProvider);
+    final isAnonymous = authRepo.currentUser?.isAnonymous ?? false;
+
     return _GradientPage(
       child: SafeArea(
         child: SingleChildScrollView(
@@ -198,6 +203,82 @@ class _HomeTabPage extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 32),
+              // 匿名ユーザー向けのアカウント登録促進
+              if (isAnonymous) ...[
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'アカウントを登録してください',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        '記録を安全に保存するため、アカウント登録がおすすめです。登録しておくと、ログイン状態が保たれ、あとから続きも簡単に使えます。',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                          height: 1.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => const SignUpPage(),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          child: const Text(
+                            'アカウントを登録',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
               // TODO: ユーザーの保存回数や単語数などを表示
               Container(
                 padding: const EdgeInsets.all(20),
@@ -276,6 +357,8 @@ class _AccountTabPage extends ConsumerWidget {
     final planAsync = ref.watch(userPlanProvider);
     final limitsAsync = ref.watch(userPlanLimitsProvider);
     final monthlyCountAsync = ref.watch(monthlyRecordingCountProvider);
+    final authRepo = ref.read(authRepositoryProvider);
+    final isAnonymous = authRepo.currentUser?.isAnonymous ?? false;
 
     return _GradientPage(
       child: SafeArea(
@@ -296,6 +379,82 @@ class _AccountTabPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 32),
+                    // 匿名ユーザー向けのアカウント登録促進
+                    if (isAnonymous) ...[
+                      Container(
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            width: 1,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.info_outline,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'アカウントを登録してください',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '記録を保存するためにアカウントを登録してください。今後、LINEなど他の方法でも登録できるようになります。',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.white.withValues(alpha: 0.9),
+                                height: 1.5,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              width: double.infinity,
+                              child: ElevatedButton(
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const SignUpPage(),
+                                    ),
+                                  );
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.white,
+                                  foregroundColor: AppColors.primary,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                                child: const Text(
+                                  'アカウントを登録',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                    ],
                     // プラン情報
                     planAsync.when(
                       data: (plan) => _PlanCard(
