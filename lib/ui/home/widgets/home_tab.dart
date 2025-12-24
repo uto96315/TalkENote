@@ -47,7 +47,7 @@ class RecordTabPage extends ConsumerWidget {
     final limits = ref.watch(userPlanLimitsProvider);
     final monthlyCountAsync = ref.watch(monthlyRecordingCountProvider);
     final maxDuration = limits.maxRecordingDuration;
-    
+
     // 残り時間を計算
     Duration? remainingTime;
     if (isRecording && state.recordingElapsed < maxDuration) {
@@ -63,14 +63,6 @@ class RecordTabPage extends ConsumerWidget {
         child: Column(
           children: [
             const SizedBox(height: 60),
-            Text(
-              'TalkENote',
-              style: TextStyle(
-                  fontSize: 44,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white),
-            ),
-            const SizedBox(height: 20),
             Text(
               isRecording ? 'レコーディング中' : 'ボタンをタップで録音開始',
               style: TextStyle(
@@ -113,8 +105,9 @@ class RecordTabPage extends ConsumerWidget {
               // 録音停止中：最大録音時間を表示
               Text(
                 '最大録音時間: ${_formatDuration(maxDuration)}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.white.withOpacity(0.8),
+                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
                     ),
               ),
             ],
@@ -129,15 +122,13 @@ class RecordTabPage extends ConsumerWidget {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       '今月の録音: $count/$limit 回${isAtLimit ? ' (上限到達)' : isNearLimit ? ' (残り${limit - count}回)' : ''}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                             color: isAtLimit
                                 ? Colors.red[300]
                                 : isNearLimit
                                     ? Colors.orange[300]
-                                    : Colors.white.withOpacity(0.7),
-                            fontWeight: isAtLimit || isNearLimit
-                                ? FontWeight.w600
-                                : FontWeight.normal,
+                                    : Colors.white,
+                            fontWeight: FontWeight.w600,
                           ),
                     ),
                   );

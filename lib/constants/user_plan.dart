@@ -32,7 +32,7 @@ class PlanLimits {
     switch (plan) {
       case UserPlan.free:
         return const PlanLimits(
-          maxRecordingDuration: Duration(minutes: 2),
+          maxRecordingDuration: Duration(minutes: 1),
           monthlyRecordingLimit: 5,
           showAds: true,
         );

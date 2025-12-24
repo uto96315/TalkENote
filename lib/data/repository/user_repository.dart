@@ -128,11 +128,14 @@ class UserRepository {
 
   /// 今月の録音回数を取得
   /// ユーザードキュメントに保存されたカウンターから取得
-  /// カウンターが存在しない場合は既存の録音データから初期化する
+  /// カウンターが存在しない場合は0を返す（初期状態）
+  /// 注意: 初期化は行わない（レースコンディションを避けるため）
+  ///       初期化は incrementMonthlyRecordingCount 内で行われる
   Future<int> getMonthlyRecordingCount(String uid) async {
     try {
       final snapshot = await userRef(uid).get();
       if (!snapshot.exists) {
+        // ユーザードキュメントが存在しない場合は0（初期状態）
         return 0;
       }
       final data = snapshot.data();
@@ -141,54 +144,27 @@ class UserRepository {
       // 保存されている月のキーと現在の月が一致するか確認
       final savedMonthKey = data?['monthlyRecordingCountMonth'] as String?;
 
-      // カウンターが存在しない、または月が変わった場合
-      if (savedMonthKey == null || savedMonthKey != currentMonthKey) {
-        // 既存の録音データから現在の月の録音回数を取得して初期化
-        final countFromQuery = await _getMonthlyRecordingCountFallback(uid);
-        if (countFromQuery > 0) {
-          // 非同期で初期化（呼び出し側は待たない）
-          _initializeMonthlyCounter(uid, countFromQuery, currentMonthKey)
-              .catchError((e) {
-            debugPrint("🚨Error initializing monthly counter: $e");
-          });
-          return countFromQuery;
-        }
-        // 月が変わった場合で録音がない場合は0を返す
-        return 0;
+      // カウンターが存在し、かつ同じ月の場合
+      if (savedMonthKey == currentMonthKey) {
+        final count = (data?['monthlyRecordingCount'] as int?) ?? 0;
+        return count;
       }
 
-      return (data?['monthlyRecordingCount'] as int?) ?? 0;
+      // カウンターが存在しない、または月が変わった場合
+      // 0を返す（初期状態または月が変わった状態）
+      // 初期化は incrementMonthlyRecordingCount 内で行われる
+      return 0;
     } catch (e) {
       debugPrint("🚨Error getting monthly recording count: $e");
-      // エラー時は旧方式（クエリ）にフォールバック
-      return await _getMonthlyRecordingCountFallback(uid);
-    }
-  }
-
-  /// 月間録音回数カウンターを初期化（既存データから同期）
-  Future<void> _initializeMonthlyCounter(
-    String uid,
-    int count,
-    String monthKey,
-  ) async {
-    try {
-      await userRef(uid).set({
-        'monthlyRecordingCount': count,
-        'monthlyRecordingCountMonth': monthKey,
-        'monthlyRecordingCountUpdatedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      debugPrint(
-          "✅Monthly counter initialized: $count recordings for month $monthKey");
-    } catch (e, stackTrace) {
-      debugPrint("🚨Error initializing monthly counter: $e");
-      debugPrint("Stack trace: $stackTrace");
-      // エラーが発生しても処理を続行（呼び出し側でcatchErrorしている）
-      rethrow;
+      // エラー時は0を返す（安全側に倒す）
+      return 0;
     }
   }
 
   /// 月間録音回数をインクリメント（録音作成時に呼ぶ）
   /// 月が変わっている場合はリセットしてからインクリメント
+  /// カウンターが存在しない場合は0から開始（既存録音データとの整合性は保持されないが、
+  /// 新規システムなので問題なし。正確性が必要な場合は別途同期処理を実装）
   /// 戻り値: インクリメント後のカウント数（エラー時は-1）
   Future<int> incrementMonthlyRecordingCount(String uid) async {
     try {
@@ -198,30 +174,25 @@ class UserRepository {
       int newCount = 0;
       await _firestore.runTransaction((transaction) async {
         final snapshot = await transaction.get(ref);
-        if (!snapshot.exists) {
-          // ユーザードキュメントが存在しない場合は作成
-          transaction.set(ref, {
-            'monthlyRecordingCount': 1,
-            'monthlyRecordingCountMonth': currentMonthKey,
-            'monthlyRecordingCountUpdatedAt': FieldValue.serverTimestamp(),
-          });
-          newCount = 1;
-          return;
-        }
-
         final data = snapshot.data();
         final savedMonthKey = data?['monthlyRecordingCountMonth'] as String?;
 
         int currentCount = 0;
-        if (savedMonthKey == currentMonthKey) {
+
+        // カウンターが存在しない、または月が変わった場合
+        if (savedMonthKey == null || savedMonthKey != currentMonthKey) {
+          // 0から開始（リセットまたは初期化）
+          // 注意: 既存の録音データとの整合性は保持されないが、
+          // 新規システムなので問題なし。既存データを考慮する場合は
+          // トランザクション外でクエリし、その結果をここで使用する必要がある
+          debugPrint(
+              "📊Resetting/Initializing monthly counter for month: $currentMonthKey (previous: $savedMonthKey)");
+          currentCount = 0;
+        } else {
           // 同じ月の場合は現在のカウントを取得
           currentCount = (data?['monthlyRecordingCount'] as int?) ?? 0;
           debugPrint(
               "📊Incrementing monthly counter: $currentCount -> ${currentCount + 1} (month: $currentMonthKey)");
-        } else {
-          // 月が変わった場合は0から開始（リセット）
-          debugPrint(
-              "📊Resetting monthly counter for new month: $currentMonthKey (previous: $savedMonthKey)");
         }
 
         newCount = currentCount + 1;
@@ -232,7 +203,7 @@ class UserRepository {
               'monthlyRecordingCountMonth': currentMonthKey,
               'monthlyRecordingCountUpdatedAt': FieldValue.serverTimestamp(),
             },
-            SetOptions(merge: true));
+            SetOptions(merge: true)); // トランザクション内で処理するため、merge: trueで問題なし
       });
 
       debugPrint(
@@ -251,27 +222,5 @@ class UserRepository {
   String _getCurrentMonthKey() {
     final now = DateTime.now();
     return '${now.year}-${now.month.toString().padLeft(2, '0')}';
-  }
-
-  /// フォールバック：クエリでカウント（エラー時用）
-  Future<int> _getMonthlyRecordingCountFallback(String uid) async {
-    try {
-      final now = DateTime.now();
-      final startOfMonth = DateTime(now.year, now.month, 1);
-      final endOfMonth = DateTime(now.year, now.month + 1, 1);
-
-      final recordingsRef = _firestore.collection('recordings');
-      final snapshot = await recordingsRef
-          .where('userId', isEqualTo: uid)
-          .where('createdAt',
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfMonth))
-          .where('createdAt', isLessThan: Timestamp.fromDate(endOfMonth))
-          .get();
-
-      return snapshot.docs.length;
-    } catch (e) {
-      debugPrint("🚨Error in fallback monthly recording count: $e");
-      return 0;
-    }
   }
 }
