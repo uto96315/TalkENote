@@ -240,7 +240,7 @@ class _HomeTabPage extends ConsumerWidget {
                       Text(
                         '記録を安全に保存するため、アカウント登録がおすすめです。登録しておくと、ログイン状態が保たれ、あとから続きも簡単に使えます。',
                         style: TextStyle(
-                          fontSize: 14,
+                          fontSize: 15,
                           color: Colors.white,
                           height: 1.5,
                           fontWeight: FontWeight.w600,
@@ -268,7 +268,7 @@ class _HomeTabPage extends ConsumerWidget {
                           child: const Text(
                             'アカウントを登録',
                             style: TextStyle(
-                              fontSize: 14,
+                              fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -300,8 +300,8 @@ class _HomeTabPage extends ConsumerWidget {
                     Text(
                       '準備中...',
                       style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white70,
+                        fontSize: 15,
+                        color: Colors.white,
                       ),
                     ),
                   ],
@@ -416,8 +416,8 @@ class _AccountTabPage extends ConsumerWidget {
                             Text(
                               '記録を保存するためにアカウントを登録してください。今後、LINEなど他の方法でも登録できるようになります。',
                               style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 15,
+                                color: Colors.white,
                                 height: 1.5,
                               ),
                             ),
@@ -444,7 +444,7 @@ class _AccountTabPage extends ConsumerWidget {
                                 child: const Text(
                                   'アカウントを登録',
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 15,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -532,7 +532,7 @@ class _PlanCard extends StatelessWidget {
                 child: Text(
                   plan.displayName,
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
@@ -609,7 +609,7 @@ class _PlanInfoRow extends StatelessWidget {
         Text(
           label,
           style: TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             color: Colors.white,
             fontWeight: FontWeight.w600,
           ),
@@ -618,7 +618,7 @@ class _PlanInfoRow extends StatelessWidget {
         Text(
           value,
           style: const TextStyle(
-            fontSize: 14,
+            fontSize: 15,
             fontWeight: FontWeight.w600,
             color: Colors.white,
           ),

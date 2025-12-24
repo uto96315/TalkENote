@@ -78,7 +78,7 @@ class RecordTabPage extends ConsumerWidget {
             Text(
               isRecording ? 'Auto stop at 01:00' : 'Auto stop after 01:00',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white70,
+                    color: Colors.white,
                   ),
             ),
             if (state.progressMessage != null ||
@@ -177,7 +177,7 @@ class RecordTabPage extends ConsumerWidget {
                   child: const Text(
                     '閉じる',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                     ),
@@ -232,7 +232,7 @@ class RecordTabPage extends ConsumerWidget {
                   child: const Text(
                     '詳細を見る',
                     style: TextStyle(
-                      fontSize: 14,
+                      fontSize: 15,
                       fontWeight: FontWeight.w600,
                     ),
                   ),

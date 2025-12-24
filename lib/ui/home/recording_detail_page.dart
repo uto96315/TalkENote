@@ -778,7 +778,7 @@ class _SentencesSection extends ConsumerWidget {
                               ].join(' / '),
                               style: TextStyle(
                                 color: Colors.grey.shade700,
-                                fontSize: 12,
+                                fontSize: 15,
                               ),
                             ),
                           ),

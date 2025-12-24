@@ -412,7 +412,7 @@ class _SignUpPageState extends ConsumerState<SignUpPage> {
                     Text(
                       '※今後、LINEなど他の方法でも登録できるようになります',
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 15,
                         color: Colors.white,
                       ),
                       textAlign: TextAlign.center,
