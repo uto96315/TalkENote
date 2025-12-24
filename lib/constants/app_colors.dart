@@ -18,13 +18,13 @@ class AppColors {
   static const gradientTop = Color(0xFFA5F6A8);
   static const gradientBottom = Color(0xFF62E245);
 
-  static const homeGradientTop = Color.fromARGB(255, 177, 245, 179);
+  static const homeGradientTop = Color.fromARGB(255, 165, 246, 168);
   static final LinearGradient homeGradient = LinearGradient(
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
     colors: [
       homeGradientTop,
-      primary.withOpacity(0.6),
+      primary.withOpacity(0.85),
     ],
   );
 
