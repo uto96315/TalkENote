@@ -222,8 +222,6 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                     ),
                   ),
                 ),
-                // ボトムナビゲーションのスペースを確保
-                const SizedBox(height: 96),
               ],
             ),
           ),
