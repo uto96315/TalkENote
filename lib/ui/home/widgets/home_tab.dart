@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../constants/app_colors.dart';
+import '../../../constants/home_tab.dart';
 import '../../../provider/home_provider.dart';
 import '../../../provider/recording_provider.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/plan_provider.dart';
 import '../../../utils/snackbar_utils.dart';
+import '../home_page.dart';
 import '../recording_detail_page.dart';
 
 class RecordTabPage extends ConsumerWidget {
@@ -120,16 +122,45 @@ class RecordTabPage extends ConsumerWidget {
                 if (count > 0 || isNearLimit) {
                   return Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      '今月の録音: $count/$limit 回${isAtLimit ? ' (上限到達)' : isNearLimit ? ' (残り${limit - count}回)' : ''}',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: isAtLimit
-                                ? Colors.red[300]
-                                : isNearLimit
-                                    ? Colors.orange[300]
-                                    : Colors.white,
-                            fontWeight: FontWeight.w600,
+                    child: Column(
+                      children: [
+                        Text(
+                          '今月の録音: $count/$limit 回${isAtLimit ? ' (上限到達)' : isNearLimit ? ' (残り${limit - count}回)' : ''}',
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    color: isAtLimit
+                                        ? Colors.red[300]
+                                        : isNearLimit
+                                            ? Colors.orange[300]
+                                            : Colors.white,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                        ),
+                        // 上限に達した場合、プラン変更ボタンを表示
+                        if (isAtLimit) ...[
+                          const SizedBox(height: 12),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              // アカウントタブに遷移
+                              ref.read(currentTabProvider.notifier).state =
+                                  HomeTab.account;
+                            },
+                            icon: const Icon(Icons.upgrade, size: 18),
+                            label: const Text('プランを変更'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.red[700],
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
                           ),
+                        ],
+                      ],
                     ),
                   );
                 }
