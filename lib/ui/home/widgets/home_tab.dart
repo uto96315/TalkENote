@@ -146,7 +146,7 @@ class RecordTabPage extends ConsumerWidget {
                                   HomeTab.account;
                             },
                             icon: const Icon(Icons.upgrade, size: 18),
-                            label: const Text('プランを変更'),
+                            label: const Text('アップグレードして回数を増やす', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.red[700],
