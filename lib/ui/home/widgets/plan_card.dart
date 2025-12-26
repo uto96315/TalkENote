@@ -1,9 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../constants/app_colors.dart';
 import '../../../constants/user_plan.dart';
+import '../../../provider/auth_provider.dart';
+import '../../../provider/user_provider.dart';
+import '../../../provider/plan_provider.dart';
 import '../../../utils/snackbar_utils.dart';
 
-class PlanCard extends StatelessWidget {
+class PlanCard extends ConsumerWidget {
   const PlanCard({
     super.key,
     required this.plan,
@@ -16,7 +21,7 @@ class PlanCard extends StatelessWidget {
   final int monthlyCount;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -75,9 +80,32 @@ class PlanCard extends StatelessWidget {
           if (plan != UserPlan.premiumPlus) ...[
             const SizedBox(height: 24),
             ElevatedButton(
-              onPressed: () {
-                // TODO: プランアップグレード画面への遷移
-                SnackBarUtils.show(context, 'プランアップグレード機能は準備中です');
+              onPressed: () async {
+                // 開発環境の場合は問答無用でプレミアム+にアップグレード
+                if (kDebugMode) {
+                  final authRepo = ref.read(authRepositoryProvider);
+                  final userRepo = ref.read(userRepositoryProvider);
+                  final user = authRepo.currentUser;
+                  
+                  if (user == null) {
+                    SnackBarUtils.show(context, 'ログインが必要です');
+                    return;
+                  }
+                  
+                  try {
+                    await userRepo.updateUserPlan(user.uid, UserPlan.premiumPlus);
+                    // プロバイダーをリフレッシュしてUIを更新
+                    ref.invalidate(userPlanProvider);
+                    ref.invalidate(userPlanLimitsProvider);
+                    ref.invalidate(monthlyRecordingCountProvider);
+                    SnackBarUtils.show(context, 'プレミアム+プランにアップグレードしました（開発環境）');
+                  } catch (e) {
+                    SnackBarUtils.show(context, 'アップグレードに失敗しました: $e');
+                  }
+                } else {
+                  // 本番環境の場合は通常の処理（準備中メッセージ）
+                  SnackBarUtils.show(context, 'プランアップグレード機能は準備中です');
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
@@ -90,9 +118,11 @@ class PlanCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
-                'プランをアップグレード',
-                style: TextStyle(
+              child: Text(
+                kDebugMode 
+                  ? 'プランをアップグレード（開発用：プレミアム+）'
+                  : 'プランをアップグレード',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                 ),

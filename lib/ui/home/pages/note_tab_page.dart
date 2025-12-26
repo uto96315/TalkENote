@@ -27,8 +27,6 @@ class NoteTabPage extends StatelessWidget {
               ),
             ),
             const Expanded(child: RecordingsList()),
-            // ボトムナビゲーションのスペースを確保
-            const SizedBox(height: 96),
           ],
         ),
       ),

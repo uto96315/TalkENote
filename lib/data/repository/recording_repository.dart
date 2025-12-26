@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../constants/recording_fields.dart';
 import '../../constants/upload_status.dart';
 import '../../constants/transcript_status.dart';
+import '../../service/ai/translation_suggestion_service.dart';
 import '../model/recording.dart';
 import '../model/sentence.dart';
 
@@ -80,6 +81,32 @@ class RecordingRepository {
       transcriptStatus: TranscriptStatusX.fromValue(
         data[RecordingFields.transcriptStatus] as String? ?? '',
       ),
+      words: (data[RecordingFields.words] as List<dynamic>?)
+              ?.map((e) {
+                if (e is Map<String, dynamic>) {
+                  return WordInfo.fromMap(e);
+                }
+                if (e is Map) {
+                  return WordInfo.fromMap(Map<String, dynamic>.from(e));
+                }
+                return null;
+              })
+              .whereType<WordInfo>()
+              .toList() ??
+          const [],
+      grammar: (data[RecordingFields.grammar] as List<dynamic>?)
+              ?.map((e) {
+                if (e is Map<String, dynamic>) {
+                  return GrammarInfo.fromMap(e);
+                }
+                if (e is Map) {
+                  return GrammarInfo.fromMap(Map<String, dynamic>.from(e));
+                }
+                return null;
+              })
+              .whereType<GrammarInfo>()
+              .toList() ??
+          const [],
     );
   }
 
@@ -204,6 +231,21 @@ class RecordingRepository {
       {
         RecordingFields.sentences:
             sentences.map((s) => s.toMap()).toList(growable: false),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  /// 単語と文法情報を更新
+  Future<void> updateWordsAndGrammar({
+    required String recordingId,
+    required List<WordInfo> words,
+    required List<GrammarInfo> grammar,
+  }) async {
+    await _collection.doc(recordingId).set(
+      {
+        RecordingFields.words: words.map((w) => w.toMap()).toList(),
+        RecordingFields.grammar: grammar.map((g) => g.toMap()).toList(),
       },
       SetOptions(merge: true),
     );

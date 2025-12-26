@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../constants/recording_fields.dart';
 import '../../constants/upload_status.dart';
 import '../../constants/transcript_status.dart';
+import '../../service/ai/translation_suggestion_service.dart';
 import 'sentence.dart';
 
 class Recording {
@@ -19,8 +20,12 @@ class Recording {
     this.transcriptRaw,
     List<Sentence>? sentences,
     this.transcriptStatus = TranscriptStatus.idle,
+    List<WordInfo>? words,
+    List<GrammarInfo>? grammar,
   })  : newWords = newWords ?? const [],
-        sentences = sentences ?? const [];
+        sentences = sentences ?? const [],
+        words = words ?? const [],
+        grammar = grammar ?? const [];
 
   final String id;
   final String userId;
@@ -34,6 +39,8 @@ class Recording {
   final String? transcriptRaw;
   final List<Sentence> sentences;
   final TranscriptStatus transcriptStatus;
+  final List<WordInfo> words; // 学習価値のある単語
+  final List<GrammarInfo> grammar; // 文法解説
 
   factory Recording.fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final data = doc.data();
@@ -69,6 +76,32 @@ class Recording {
       transcriptStatus: TranscriptStatusX.fromValue(
         data[RecordingFields.transcriptStatus] as String? ?? '',
       ),
+      words: (data[RecordingFields.words] as List<dynamic>?)
+              ?.map((e) {
+                if (e is Map<String, dynamic>) {
+                  return WordInfo.fromMap(e);
+                }
+                if (e is Map) {
+                  return WordInfo.fromMap(Map<String, dynamic>.from(e));
+                }
+                return null;
+              })
+              .whereType<WordInfo>()
+              .toList() ??
+          const [],
+      grammar: (data[RecordingFields.grammar] as List<dynamic>?)
+              ?.map((e) {
+                if (e is Map<String, dynamic>) {
+                  return GrammarInfo.fromMap(e);
+                }
+                if (e is Map) {
+                  return GrammarInfo.fromMap(Map<String, dynamic>.from(e));
+                }
+                return null;
+              })
+              .whereType<GrammarInfo>()
+              .toList() ??
+          const [],
     );
   }
 
@@ -86,6 +119,10 @@ class Recording {
       if (sentences.isNotEmpty)
         RecordingFields.sentences: sentences.map((s) => s.toMap()).toList(),
       RecordingFields.transcriptStatus: transcriptStatus.value,
+      if (words.isNotEmpty)
+        RecordingFields.words: words.map((w) => w.toMap()).toList(),
+      if (grammar.isNotEmpty)
+        RecordingFields.grammar: grammar.map((g) => g.toMap()).toList(),
     };
   }
 
@@ -122,6 +159,8 @@ class Recording {
     String? transcriptRaw,
     List<Sentence>? sentences,
     TranscriptStatus? transcriptStatus,
+    List<WordInfo>? words,
+    List<GrammarInfo>? grammar,
   }) {
     return Recording(
       id: id ?? this.id,
@@ -136,6 +175,8 @@ class Recording {
       transcriptRaw: transcriptRaw ?? this.transcriptRaw,
       sentences: sentences ?? this.sentences,
       transcriptStatus: transcriptStatus ?? this.transcriptStatus,
+      words: words ?? this.words,
+      grammar: grammar ?? this.grammar,
     );
   }
 }

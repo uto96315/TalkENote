@@ -140,12 +140,15 @@ class NotificationService {
       importance: Importance.high,
       priority: Priority.high,
       showWhen: true,
+      playSound: true,
+      enableVibration: true,
     );
 
     const iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
       presentSound: true,
+      sound: 'rec_complete', // カスタム通知音を設定（拡張子なし）
     );
 
     const details = NotificationDetails(
