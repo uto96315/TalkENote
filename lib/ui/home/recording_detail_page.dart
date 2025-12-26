@@ -7,10 +7,7 @@ import 'package:talkenote/constants/app_colors.dart';
 
 import '../../data/model/recording.dart';
 import '../../data/model/sentence.dart';
-import '../../provider/ai_provider.dart';
-import '../../service/ai/translation_suggestion_service.dart';
 import '../../provider/recording_provider.dart';
-import '../../constants/transcript_status.dart';
 import '../../utils/snackbar_utils.dart';
 
 class RecordingDetailPage extends ConsumerStatefulWidget {
@@ -27,9 +24,6 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
   late final TextEditingController _titleCtrl;
   late final TextEditingController _memoCtrl;
   late Recording _recording;
-  final bool _saving = false;
-  bool _splitting = false;
-  bool _translating = false;
   bool _isEditingTitle = false;
   bool _isEditingMemo = false;
 
@@ -59,222 +53,320 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
         : '-';
 
     return Scaffold(
-      resizeToAvoidBottomInset: true,
-      body: GestureDetector(
-        onTap: () {
-          // テキストフィールド外をタップしたら編集を終了
-          if (_isEditingTitle) {
-            setState(() => _isEditingTitle = false);
-            _saveTitle();
-          }
-          if (_isEditingMemo) {
-            setState(() => _isEditingMemo = false);
-            _saveMemo();
-          }
-          // キーボードを閉じる
-          FocusScope.of(context).unfocus();
-        },
-        child: Stack(
-          children: [
-            SingleChildScrollView(
-              child: SafeArea(
-                child: Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 40),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 50),
-                      _isEditingTitle
-                          ? GestureDetector(
-                              onTap: () {}, // テキストフィールド内のタップは無視
-                              child: TextField(
-                                controller: _titleCtrl,
-                                autofocus: true,
-                                textInputAction: TextInputAction.done,
-                                decoration: const InputDecoration(
-                                  labelText: 'タイトル',
-                                  border: OutlineInputBorder(),
-                                ),
-                                onSubmitted: (_) {
-                                  setState(() => _isEditingTitle = false);
-                                  _saveTitle();
-                                },
-                              ),
-                            )
-                          : InkWell(
-                              onTap: () {
-                                setState(() => _isEditingTitle = true);
-                              },
-                              child: _row(
-                                  'タイトル',
-                                  _titleCtrl.text.isEmpty
-                                      ? '-'
-                                      : _titleCtrl.text),
-                            ),
-                      const SizedBox(height: 12),
-                      _row('作成日時', dateLabel),
-                      const SizedBox(height: 12),
-                      _isEditingMemo
-                          ? Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                GestureDetector(
-                                  onTap: () {}, // テキストフィールド内のタップは無視
-                                  child: TextField(
-                                    controller: _memoCtrl,
-                                    autofocus: true,
-                                    minLines: 3,
-                                    maxLines: 5,
-                                    textInputAction: TextInputAction.newline,
-                                    decoration: const InputDecoration(
-                                      labelText: 'メモ',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Align(
-                                  alignment: Alignment.centerRight,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      setState(() => _isEditingMemo = false);
-                                      _saveMemo();
-                                      FocusScope.of(context).unfocus();
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 24,
-                                        vertical: 12,
-                                      ),
-                                    ),
-                                    child: const Text('完了'),
-                                  ),
-                                ),
-                              ],
-                            )
-                          : InkWell(
-                              onTap: () {
-                                setState(() => _isEditingMemo = true);
-                              },
-                              child: _row(
-                                  'メモ',
-                                  _memoCtrl.text.isEmpty
-                                      ? '-'
-                                      : _memoCtrl.text),
-                            ),
-                      if (recording.newWords.isNotEmpty) ...[
-                        const SizedBox(height: 16),
-                        Text(
-                          '新規単語',
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 4,
-                          children: recording.newWords
-                              .map((w) => Chip(label: Text(w)))
-                              .toList(),
-                        ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: AppColors.homeGradient,
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ヘッダー
+              _buildHeader(context),
+              // コンテンツ
+              Expanded(
+                child: SingleChildScrollView(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // タイトル・メモ・日時セクション
+                        _buildInfoSection(context, recording, dateLabel),
+                        const SizedBox(height: 24),
+                        // 文字起こし全文
+                        if (recording.transcriptRaw != null &&
+                            recording.transcriptRaw!.isNotEmpty) ...[
+                          _TranscriptCard(text: recording.transcriptRaw),
+                          const SizedBox(height: 24),
+                        ],
+                        // 単語・熟語セクション
+                        if (recording.words.isNotEmpty) ...[
+                          _buildVocabularySection(context, recording),
+                          const SizedBox(height: 24),
+                        ],
+                        // センテンスごとの翻訳
+                        if (recording.sentences.isNotEmpty)
+                          _SentencesSection(
+                            sentences: recording.sentences,
+                            onEdit: _editSentence,
+                            recordingId: _recording.id,
+                            onUpdate: (updated) {
+                              setState(() {
+                                _recording = updated;
+                              });
+                            },
+                          ),
                       ],
-                      const SizedBox(height: 24),
-                      // Text(
-                      //   '文字起こしと分割',
-                      //   style: Theme.of(context).textTheme.titleMedium,
-                      // ),
-                      // const SizedBox(height: 8),
-                      // Wrap(
-                      //   spacing: 12,
-                      //   runSpacing: 8,
-                      //   children: [
-                      //     ElevatedButton.icon(
-                      //       icon: _recording.transcriptStatus ==
-                      //               TranscriptStatus.transcribing
-                      //           ? const SizedBox(
-                      //               width: 16,
-                      //               height: 16,
-                      //               child: CircularProgressIndicator(
-                      //                   strokeWidth: 2),
-                      //             )
-                      //           : const Icon(Icons.translate),
-                      //       label: const Text('文字起こしする'),
-                      //       onPressed: _recording.transcriptStatus ==
-                      //               TranscriptStatus.transcribing
-                      //           ? null
-                      //           : () {
-                      //               debugPrint("tapped");
-                      //               _onTranscribe();
-                      //             },
-                      //     ),
-                      //     ElevatedButton.icon(
-                      //       icon: _splitting
-                      //           ? const SizedBox(
-                      //               width: 16,
-                      //               height: 16,
-                      //               child: CircularProgressIndicator(
-                      //                   strokeWidth: 2),
-                      //             )
-                      //           : const Icon(Icons.format_list_bulleted),
-                      //       label: const Text('文に分割'),
-                      //       onPressed: _splitting ? null : _onSplitSentences,
-                      //     ),
-                      //     ElevatedButton.icon(
-                      //       icon: _translating
-                      //           ? const SizedBox(
-                      //               width: 16,
-                      //               height: 16,
-                      //               child: CircularProgressIndicator(
-                      //                   strokeWidth: 2),
-                      //             )
-                      //           : const Icon(Icons.g_translate),
-                      //       label: const Text('翻訳候補を生成'),
-                      //       onPressed:
-                      //           _translating ? null : _onGenerateTranslations,
-                      //     ),
-                      //   ],
-                      // ),
-                      // const SizedBox(height: 12),
-                      _TranscriptCard(text: recording.transcriptRaw),
-                      const SizedBox(height: 16),
-                      _SentencesSection(
-                        sentences: recording.sentences,
-                        onEdit: _editSentence,
-                        recordingId: _recording.id,
-                        onUpdate: (updated) {
-                          setState(() {
-                            _recording = updated;
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 16,
-              left: 16,
-              child: SafeArea(
-                child: InkWell(
-                  onTap: () => Navigator.of(context).pop(),
-                  child: Container(
-                    height: 50,
-                    width: 50,
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: AppColors.textSecondary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(1000),
                     ),
-                    child: const Icon(Icons.arrow_back, color: AppColors.white),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildHeader(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Row(
+        children: [
+          InkWell(
+            onTap: () => Navigator.of(context).pop(),
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              height: 44,
+              width: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1,
+                ),
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+          ),
+          const Spacer(),
+          Text(
+            '録音詳細',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const Spacer(),
+          const SizedBox(width: 44), // バランス調整
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoSection(
+      BuildContext context, Recording recording, String dateLabel) {
+    return _ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _isEditingTitle
+              ? TextField(
+                  controller: _titleCtrl,
+                  autofocus: true,
+                  textInputAction: TextInputAction.done,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'タイトル',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
+                  ),
+                  onSubmitted: (_) {
+                    setState(() => _isEditingTitle = false);
+                    _saveTitle();
+                  },
+                )
+              : InkWell(
+                  onTap: () {
+                    setState(() => _isEditingTitle = true);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'タイトル',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _titleCtrl.text.isEmpty
+                                    ? 'タイトル未設定'
+                                    : _titleCtrl.text,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: _titleCtrl.text.isEmpty
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+          const SizedBox(height: 20),
+          _InfoRow(
+            icon: Icons.calendar_today_outlined,
+            label: '作成日時',
+            value: dateLabel,
+          ),
+          const SizedBox(height: 16),
+          _isEditingMemo
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: _memoCtrl,
+                      autofocus: true,
+                      minLines: 3,
+                      maxLines: 5,
+                      decoration: InputDecoration(
+                        labelText: 'メモ',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey.shade50,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: ElevatedButton(
+                        onPressed: () {
+                          setState(() => _isEditingMemo = false);
+                          _saveMemo();
+                          FocusScope.of(context).unfocus();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 24,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text('保存'),
+                      ),
+                    ),
+                  ],
+                )
+              : InkWell(
+                  onTap: () {
+                    setState(() => _isEditingMemo = true);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(
+                          Icons.note_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'メモ',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textSecondary,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _memoCtrl.text.isEmpty
+                                    ? 'メモを追加'
+                                    : _memoCtrl.text,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: _memoCtrl.text.isEmpty
+                                      ? AppColors.textSecondary
+                                      : AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.edit_outlined,
+                          size: 20,
+                          color: AppColors.textSecondary,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVocabularySection(BuildContext context, Recording recording) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 単語セクション
+        if (recording.words.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.book_outlined,
+            title: '単語',
+            subtitle: '${recording.words.length}個',
+          ),
+          const SizedBox(height: 12),
+          _ModernCard(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: recording.words.map((wordInfo) {
+                return ConstrainedBox(
+                  constraints:  BoxConstraints(
+                    minWidth: MediaQuery.of(context).size.width,
+                  ),
+                  child: _WordChip(
+                    word: wordInfo.word,
+                    ja: wordInfo.ja,
+                    partOfSpeech: wordInfo.partOfSpeech,
+                    example: wordInfo.example,
+                    exampleJa: wordInfo.exampleJa,
+                    difficulty: wordInfo.difficulty,
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -306,123 +398,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
     }
   }
 
-  Widget _row(String label, String value) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 100,
-          child: Text(
-            label,
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-        ),
-        Expanded(
-          child: Text(value.isEmpty ? '-' : value),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _onTranscribe() async {
-    final repo = ref.read(recordingRepositoryProvider);
-    final transcription = ref.read(transcriptionServiceProvider);
-    if (!transcription.isConfigured) {
-      SnackBarUtils.show(context, 'OpenAI APIキーが設定されていません (.env)');
-      return;
-    }
-    _log('Transcribe 🎙️: start (id=${_recording.id})');
-    debugPrint('Transcribe 🎙️: start (id=${_recording.id})');
-    setState(() {
-      _recording = _recording.copyWith(
-        transcriptStatus: TranscriptStatus.transcribing,
-      );
-    });
-    _log('Transcribe 🎙️: status -> transcribing (local)');
-    await repo.updateTranscriptStatus(
-      recordingId: _recording.id,
-      status: TranscriptStatus.transcribing,
-    );
-    _log('Transcribe 🎙️: status -> transcribing (remote)');
-    var success = false;
-    try {
-      final url = await repo.downloadUrl(_recording.storagePath);
-      final fileName = _recording.storagePath.split('/').last;
-      _log('Transcribe 🎙️: download URL ready for $fileName');
-      final text =
-          await transcription.transcribeFromUrl(url, fileName: fileName);
-      _log('Transcribe 🎙️: whisper done ✅ saving text (${text.length} chars)');
-      await repo.updateTranscriptRaw(
-        recordingId: _recording.id,
-        transcriptRaw: text,
-      );
-      _log('Transcribe 🎙️: transcriptRaw saved to Firestore');
-      setState(() {
-        _recording = _recording.copyWith(
-          transcriptRaw: text,
-          sentences: const [],
-          transcriptStatus: TranscriptStatus.done,
-        );
-      });
-      _log('Transcribe 🎙️: state -> done ✅ (local)');
-      success = true;
-      SnackBarUtils.show(context, '文字起こしが完了しました');
-    } catch (e) {
-      _log('Transcribe 🎙️: failed ❌ $e');
-      await repo.updateTranscriptStatus(
-        recordingId: _recording.id,
-        status: TranscriptStatus.failed,
-      );
-      SnackBarUtils.show(context, '文字起こしに失敗しました: $e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _recording = _recording.copyWith(
-            transcriptStatus:
-                success ? TranscriptStatus.done : TranscriptStatus.failed,
-          );
-        });
-      }
-    }
-  }
-
-  Future<void> _onSplitSentences() async {
-    final splitter = ref.read(sentenceSplitterServiceProvider);
-    final repo = ref.read(recordingRepositoryProvider);
-    final raw = _recording.transcriptRaw?.trim() ?? '';
-
-    if (raw.isEmpty) {
-      SnackBarUtils.show(context, '先に文字起こしを実行してください');
-      return;
-    }
-    if (!splitter.isConfigured) {
-      SnackBarUtils.show(context, 'OpenAI APIキーが設定されていません (.env)');
-      return;
-    }
-    _log('Split ✂️: start (id=${_recording.id})');
-    setState(() => _splitting = true);
-    try {
-      final sentencesText = await splitter.splitSentences(raw);
-      _log('Split ✂️: AI returned ${sentencesText.length} sentences');
-      final sentences =
-          sentencesText.map((t) => Sentence.withGeneratedId(t)).toList();
-      await repo.updateSentences(
-        recordingId: _recording.id,
-        sentences: sentences,
-      );
-      _log('Split ✂️: sentences saved to Firestore');
-      setState(() {
-        _recording = _recording.copyWith(sentences: sentences);
-      });
-      _log('Split ✂️: state updated ✅');
-      SnackBarUtils.show(context, '文分割が完了しました');
-    } catch (e) {
-      _log('Split ✂️: failed ❌ $e');
-      SnackBarUtils.show(context, '文分割に失敗しました: $e');
-    } finally {
-      if (mounted) setState(() => _splitting = false);
-    }
-  }
+  // 将来的に使用する可能性があるためコメントアウト
 
   Future<void> _editSentence(Sentence sentence) async {
     final repo = ref.read(recordingRepositoryProvider);
@@ -433,15 +409,11 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
         context: context,
         builder: (context) {
           return AlertDialog(
-            title: const Text('文を編集'),
+            title: const Text('センテンスを編集'),
             content: TextField(
               controller: ctrl,
-              minLines: 1,
-              maxLines: 4,
+              maxLines: 5,
               autofocus: true,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-              ),
             ),
             actions: [
               TextButton(
@@ -449,7 +421,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
                 child: const Text('キャンセル'),
               ),
               TextButton(
-                onPressed: () => Navigator.of(context).pop(ctrl.text.trim()),
+                onPressed: () => Navigator.of(context).pop(ctrl.text),
                 child: const Text('保存'),
               ),
             ],
@@ -459,90 +431,299 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
     } finally {
       ctrl.dispose();
     }
-    if (updatedText == null) return;
-    if (updatedText.isEmpty) {
-      SnackBarUtils.show(context, '空の文は保存できません');
-      return;
-    }
+    if (updatedText == null || updatedText == sentence.text) return;
 
+    final updated = sentence.copyWith(text: updatedText);
     final newSentences = _recording.sentences
-        .map(
-          (s) => s.id == sentence.id ? s.copyWith(text: updatedText) : s,
-        )
+        .map((s) => s.id == sentence.id ? updated : s)
         .toList();
-    try {
-      await repo.updateSentences(
-        recordingId: _recording.id,
-        sentences: newSentences,
-      );
-      setState(() {
-        _recording = _recording.copyWith(sentences: newSentences);
-      });
-      SnackBarUtils.show(context, '更新しました');
-    } catch (e) {
-      SnackBarUtils.show(context, '更新に失敗しました: $e');
-    }
-  }
-
-  Future<void> _onGenerateTranslations() async {
-    final translator = ref.read(translationSuggestionServiceProvider);
-    final repo = ref.read(recordingRepositoryProvider);
-
-    if (!translator.isConfigured) {
-      SnackBarUtils.show(context, 'OpenAI APIキーが設定されていません (.env)');
-      return;
-    }
-    if (_recording.sentences.isEmpty) {
-      SnackBarUtils.show(context, '先に文分割を実行してください');
-      return;
-    }
-
-    setState(() => _translating = true);
-    try {
-      final updated = <Sentence>[];
-      for (final s in _recording.sentences) {
-        final res = await translator.generateSuggestions(
-          s.text,
-          genreHint: s.genre,
-          allowedSegments: kAllowedSegments,
-        );
-        final selectedSentences = res.selected.isNotEmpty
-            ? res.selected
-            : res.suggestions
-                .map((m) => m['en'])
-                .whereType<String>()
-                .where((e) => e.isNotEmpty)
-                .toList();
-        updated.add(
-          s.copyWith(
-            ja: res.ja,
-            suggestions: res.suggestions,
-            selected: selectedSentences,
-            genre: res.genre ?? s.genre,
-            segment: res.segment ?? s.segment,
-          ),
-        );
-      }
-      await repo.updateSentences(
-        recordingId: _recording.id,
-        sentences: updated,
-      );
-      setState(() {
-        _recording = _recording.copyWith(sentences: updated);
-      });
-      SnackBarUtils.show(context, '翻訳候補を生成しました');
-    } catch (e) {
-      SnackBarUtils.show(context, '翻訳候補の生成に失敗しました: $e');
-    } finally {
-      if (mounted) setState(() => _translating = false);
-    }
+    await repo.updateSentences(
+      recordingId: _recording.id,
+      sentences: newSentences,
+    );
+    setState(() {
+      _recording = _recording.copyWith(sentences: newSentences);
+    });
   }
 }
 
 void _log(String message) {
-  print(message); // keep stdout
-  dev.log(message,
-      name: 'RecordingDetailPage'); // ensure OS log (Xcode/console)
+  print(message);
+  dev.log(message, name: 'RecordingDetailPage');
+}
+
+// モダンなカードウィジェット
+class _ModernCard extends StatelessWidget {
+  const _ModernCard({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(20),
+      width: MediaQuery.of(context).size.width,
+      child: child,
+    );
+  }
+}
+
+// セクションヘッダー
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 20),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: -0.5,
+          ),
+        ),
+        if (subtitle != null) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              subtitle!,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// 情報行
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 20, color: AppColors.textSecondary),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// 単語チップ
+class _WordChip extends StatelessWidget {
+  const _WordChip({
+    required this.word,
+    required this.ja,
+    this.partOfSpeech,
+    this.example,
+    this.exampleJa,
+    this.difficulty,
+  });
+
+  final String word;
+  final String ja;
+  final String? partOfSpeech;
+  final String? example;
+  final String? exampleJa;
+  final int? difficulty;
+
+  /// 品詞を日本語ラベルに変換
+  String _getPartOfSpeechLabel(String partOfSpeech) {
+    switch (partOfSpeech.toLowerCase()) {
+      case 'noun':
+        return '名詞';
+      case 'verb':
+        return '動詞';
+      case 'adjective':
+        return '形容詞';
+      case 'adverb':
+        return '副詞';
+      case 'idiom':
+        return 'イディオム';
+      case 'phrase':
+        return 'フレーズ';
+      case 'preposition':
+        return '前置詞';
+      case 'conjunction':
+        return '接続詞';
+      case 'pronoun':
+        return '代名詞';
+      default:
+        return partOfSpeech; // 不明な場合はそのまま返す
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(
+        minWidth: 140,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                word,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primary,
+                ),
+              ),
+              if (partOfSpeech != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.textSecondary.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    _getPartOfSpeechLabel(partOfSpeech!),
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+              if (difficulty != null) ...[
+                const SizedBox(width: 6),
+                ...List.generate(5, (index) {
+                  return Icon(
+                    Icons.star,
+                    size: 12,
+                    color: index < difficulty!
+                        ? Colors.amber
+                        : Colors.grey.shade300,
+                  );
+                }),
+              ],
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            ja,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          if (example != null && example!.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              '"$example"',
+              style: TextStyle(
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            if (exampleJa != null && exampleJa!.isNotEmpty) ...[
+              const SizedBox(height: 2),
+              Text(
+                '"$exampleJa"',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textSecondary.withOpacity(0.8),
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _TranscriptCard extends StatelessWidget {
@@ -552,34 +733,56 @@ class _TranscriptCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final value = text?.trim() ?? '';
-    return Container(
-      decoration: BoxDecoration(
-        border:
-            Border.all(color: AppColors.textSecondary.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+    return _ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.secondary.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.notes_outlined,
+                  size: 18,
+                  color: AppColors.secondary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                '会話全文',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (value.isEmpty)
             Text(
-              '会話全文',
-              style: theme.textTheme.titleMedium,
+              'まだ文字起こしされていません',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else
+            SelectableText(
+              value,
+              style: const TextStyle(
+                fontSize: 15,
+                color: AppColors.textPrimary,
+                height: 1.6,
+              ),
             ),
-            const SizedBox(height: 8),
-            if (value.isEmpty)
-              Text(
-                'まだ文字起こしされていません',
-                style:
-                    theme.textTheme.bodyLarge?.copyWith(color: theme.hintColor),
-              )
-            else
-              SelectableText(value),
-          ],
-        ),
+        ],
       ),
     );
   }
@@ -598,197 +801,184 @@ class _SentencesSection extends ConsumerWidget {
   final String recordingId;
   final void Function(Recording) onUpdate;
 
-  Future<void> _toggleSuggestionSelection(
-    WidgetRef ref,
-    BuildContext context,
-    Sentence sentence,
-    String suggestionText,
-  ) async {
-    final repo = ref.read(recordingRepositoryProvider);
-
-    // selectedには1つしか入らないため、既に選択されている場合は解除、
-    // されていない場合は既存の選択をクリアして新しい選択肢を設定
-    final currentSelected = List<String>.from(sentence.selected);
-    final isCurrentlySelected = currentSelected.contains(suggestionText);
-
-    final newSelected = isCurrentlySelected
-        ? <String>[] // 既に選択されている場合は解除
-        : <String>[suggestionText]; // 新しい選択肢を設定（既存の選択はクリア）
-
-    final updatedSentence = sentence.copyWith(selected: newSelected);
-    final newSentences = sentences
-        .map((s) => s.id == sentence.id ? updatedSentence : s)
-        .toList();
-
-    try {
-      await repo.updateSentences(
-        recordingId: recordingId,
-        sentences: newSentences,
-      );
-      // 親ウィジェットに更新を通知
-      final updatedRecording = await repo.fetchRecordingById(recordingId);
-      if (updatedRecording != null) {
-        onUpdate(updatedRecording);
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新に失敗しました: $e')),
-        );
-      }
-    }
-  }
-
-  void _showDescPopup(BuildContext context, String desc) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('説明'),
-          content: Text(desc),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('閉じる'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        border:
-            Border.all(color: AppColors.textSecondary.withValues(alpha: 0.3)),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'センテンスごとの翻訳候補',
-              style: theme.textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            if (sentences.isEmpty)
-              Text(
-                'まだ分割されていません。「文に分割」を押してください。',
-                style: theme.textTheme.bodyMedium
-                    ?.copyWith(color: theme.hintColor),
-              )
-            else
-              ListView.separated(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: sentences.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) {
-                  final s = sentences[i];
-                  return ListTile(
-                    title: Text(s.text,
-                        style: TextStyle(fontWeight: FontWeight.bold)),
-                    contentPadding: EdgeInsets.symmetric(vertical: 10),
-                    subtitle: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const SizedBox(height: 10),
-                        // if ((s.ja ?? '').isNotEmpty)
-                        //   Padding(
-                        //     padding: const EdgeInsets.only(top: 4),
-                        //     child: Text(
-                        //       s.ja!,
-                        //       style: const TextStyle(color: Colors.black87),
-                        //     ),
-                        //   ),
-                        if (s.suggestions.isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Wrap(
-                              spacing: 10,
-                              runSpacing: 10,
-                              children: s.suggestions.map((suggestion) {
-                                final sentence = suggestion['en'] ?? '';
-                                final desc = suggestion['desc'] ?? '';
-                                final isSelected =
-                                    s.selected.contains(sentence);
-                                return InkWell(
-                                  onTap: () => _toggleSuggestionSelection(
-                                      ref, context, s, sentence),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      border: Border.all(
-                                        color: isSelected
-                                            ? Colors.blue
-                                            : Colors.grey,
-                                        width: isSelected ? 2 : 1,
-                                      ),
-                                      borderRadius: BorderRadius.circular(16),
-                                      color: isSelected
-                                          ? Colors.blue.shade50
-                                          : null,
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Flexible(
-                                          child: Text(
-                                            sentence,
-                                            softWrap: true,
-                                          ),
-                                        ),
-                                        if (desc.isNotEmpty) ...[
-                                          const SizedBox(width: 6),
-                                          GestureDetector(
-                                            onTap: () =>
-                                                _showDescPopup(context, desc),
-                                            child: Icon(
-                                              Icons.info_outline,
-                                              size: 18,
-                                              color: Colors.grey.shade600,
-                                            ),
-                                          ),
-                                        ],
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                            ),
-                          ),
-                        if ((s.genre ?? '').isNotEmpty ||
-                            (s.segment ?? '').isNotEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 4),
-                            child: Text(
-                              [
-                                if ((s.genre ?? '').isNotEmpty)
-                                  'genre: ${s.genre}',
-                                if ((s.segment ?? '').isNotEmpty)
-                                  'segment: ${s.segment}',
-                              ].join(' / '),
-                              style: TextStyle(
-                                color: Colors.grey.shade700,
-                                fontSize: 15,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
-                },
+    return _ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  Icons.translate,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
               ),
-          ],
+              const SizedBox(width: 10),
+              const Text(
+                'センテンスごとの翻訳',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          if (sentences.isEmpty)
+            Text(
+              'まだ分割されていません',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: sentences.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 16),
+              itemBuilder: (_, i) {
+                final s = sentences[i];
+                return _SentenceCard(
+                  sentence: s,
+                  onEdit: () => onEdit(s),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SentenceCard extends StatelessWidget {
+  const _SentenceCard({
+    required this.sentence,
+    required this.onEdit,
+  });
+
+  final Sentence sentence;
+  final VoidCallback onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.grey.shade200,
+          width: 1,
         ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  sentence.text,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    height: 1.5,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: onEdit,
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.edit_outlined,
+                    size: 18,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (sentence.en != null && sentence.en!.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.blue.shade200,
+                  width: 1,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    sentence.en!,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (sentence.grammarPoint != null &&
+              sentence.grammarPoint!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: Colors.amber.shade200,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline,
+                    size: 18,
+                    color: Colors.amber.shade700,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      sentence.grammarPoint!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: AppColors.textPrimary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

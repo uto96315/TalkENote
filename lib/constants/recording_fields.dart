@@ -13,4 +13,6 @@ class RecordingFields {
   static const transcriptRaw = 'transcriptRaw';
   static const sentences = 'sentences';
   static const transcriptStatus = 'transcriptStatus';
+  static const words = 'words'; // 単語情報リスト
+  static const grammar = 'grammar'; // 文法解説リスト
 }

@@ -6,19 +6,18 @@ class Sentence {
     required this.text,
     this.confidence,
     this.ja,
-    List<Map<String, String>>? suggestions,
-    List<String>? selected,
+    this.en,
+    this.grammarPoint,
     this.genre,
     this.segment,
-  })  : suggestions = suggestions ?? const [],
-        selected = selected ?? const [];
+  });
 
   final String id;
   final String text;
   final double? confidence;
-  final String? ja;
-  final List<Map<String, String>> suggestions; // [{en, desc}]
-  final List<String> selected;
+  final String? ja; // 日本語（元のテキストまたは翻訳）
+  final String? en; // 英語翻訳（単一）
+  final String? grammarPoint; // 文法的ポイント（例: "許可を求めるのはmay I ~?で表す"）
   final String? genre;
   final String? segment;
 
@@ -28,30 +27,8 @@ class Sentence {
       text: map['text'] as String? ?? '',
       confidence: (map['confidence'] as num?)?.toDouble(),
       ja: map['ja'] as String?,
-      suggestions: (map['suggestions'] as List<dynamic>?)
-              ?.map((e) {
-                if (e is Map<String, dynamic>) {
-                  return {
-                    'en': e['en']?.toString() ?? '',
-                    'desc': e['desc']?.toString() ?? '',
-                  };
-                }
-                if (e is Map) {
-                  final m = Map<String, dynamic>.from(e);
-                  return {
-                    'en': m['en']?.toString() ?? '',
-                    'desc': m['desc']?.toString() ?? '',
-                  };
-                }
-                return null;
-              })
-              .whereType<Map<String, String>>()
-              .toList() ??
-          const [],
-      selected: (map['selected'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          const [],
+      en: map['en'] as String?,
+      grammarPoint: map['grammarPoint'] as String?,
       genre: map['genre'] as String?,
       segment: map['segment'] as String?,
     );
@@ -63,8 +40,8 @@ class Sentence {
       'text': text,
       if (confidence != null) 'confidence': confidence,
       if (ja != null) 'ja': ja,
-      if (suggestions.isNotEmpty) 'suggestions': suggestions,
-      if (selected.isNotEmpty) 'selected': selected,
+      if (en != null) 'en': en,
+      if (grammarPoint != null) 'grammarPoint': grammarPoint,
       if (genre != null) 'genre': genre,
       if (segment != null) 'segment': segment,
     };
@@ -75,8 +52,8 @@ class Sentence {
     String? text,
     double? confidence,
     String? ja,
-    List<Map<String, String>>? suggestions,
-    List<String>? selected,
+    String? en,
+    String? grammarPoint,
     String? genre,
     String? segment,
   }) {
@@ -85,8 +62,8 @@ class Sentence {
       text: text ?? this.text,
       confidence: confidence ?? this.confidence,
       ja: ja ?? this.ja,
-      suggestions: suggestions ?? this.suggestions,
-      selected: selected ?? this.selected,
+      en: en ?? this.en,
+      grammarPoint: grammarPoint ?? this.grammarPoint,
       genre: genre ?? this.genre,
       segment: segment ?? this.segment,
     );
@@ -96,8 +73,8 @@ class Sentence {
     String text, {
     double? confidence,
     String? ja,
-    List<Map<String, String>>? suggestions,
-    List<String>? selected,
+    String? en,
+    String? grammarPoint,
     String? genre,
     String? segment,
   }) {
@@ -106,8 +83,8 @@ class Sentence {
       text: text,
       confidence: confidence,
       ja: ja,
-      suggestions: suggestions ?? const [],
-      selected: selected ?? const [],
+      en: en,
+      grammarPoint: grammarPoint,
       genre: genre,
       segment: segment,
     );

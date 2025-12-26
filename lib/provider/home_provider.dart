@@ -275,13 +275,14 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
         newWords: const [],
         status: UploadStatus.uploaded,
       );
-      
+
       // 月間録音回数をインクリメント
       final newCount = await _userRepo.incrementMonthlyRecordingCount(user.uid);
       if (newCount == -1) {
-        debugPrint('⚠️Failed to increment monthly recording count, but continuing with recording save');
+        debugPrint(
+            '⚠️Failed to increment monthly recording count, but continuing with recording save');
       }
-      
+
       // プロバイダーをリフレッシュしてUIを更新
       ref.invalidate(monthlyRecordingCountProvider);
 
@@ -443,7 +444,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       final fullTranslation =
           await _translator.translateFullText(transcriptText);
       print(
-          'Pipeline: full translation done, ja length=${fullTranslation.ja.length}, phrases=${fullTranslation.phrases.length}');
+          'Pipeline: full translation done, ja length=${fullTranslation.ja.length}, words=${fullTranslation.words.length}');
 
       // ステップ2: 全体翻訳をセンテンスに分割（日本語側も分割）
       // 簡易的に全体翻訳をセンテンス数で分割するか、AIに分割してもらう
@@ -454,26 +455,18 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
         final s = sentences[i];
         state = state.copyWith(
             progressMessage: '翻訳を調整しています... (${i + 1}/${sentences.length})');
-        // センテンスごとの詳細化（提案、ジャンル、セグメントなど）
+        // センテンスごとの詳細化（翻訳、文法ポイント、ジャンル、セグメントなど）
         final res = await _translator.generateSuggestions(
           s.text,
           genreHint: s.genre,
           allowedSegments: kAllowedSegments,
         );
-        // selectedが空の場合は空のリストを設定（デフォルトは選択なし）
-        final selectedSentences = res.selected;
-
-        // 全体翻訳から該当センテンスの日本語訳を抽出（簡易版：最初のセンテンスから順に割り当て）
-        // TODO: より精密なマッピングが必要な場合は、AIに分割してもらう
-        final sentenceJa = fullTranslation.ja.isNotEmpty
-            ? fullTranslation.ja // 暫定的に全体翻訳を使用
-            : res.ja; // フォールバック
 
         translated.add(
           s.copyWith(
-            ja: sentenceJa,
-            suggestions: res.suggestions,
-            selected: selectedSentences,
+            ja: res.ja,
+            en: res.en,
+            grammarPoint: res.grammarPoint,
             genre: res.genre ?? s.genre,
             segment: res.segment ?? s.segment,
           ),
@@ -487,10 +480,16 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       print(
           'Pipeline: translation suggestions saved count=${translated.length}');
 
-      // ステップ3: 全体から抽出されたフレーズを辞書に保存（後で実装）
-      // TODO: 辞書保存処理を追加
-      print(
-          'Pipeline: phrases extracted count=${fullTranslation.phrases.length}');
+      // ステップ3: 全体から抽出された単語・熟語情報を保存
+      if (fullTranslation.words.isNotEmpty) {
+        await _recordingRepo.updateWordsAndGrammar(
+          recordingId: recordingId,
+          words: fullTranslation.words,
+          grammar: const [], // 文法解説は削除
+        );
+        print(
+            'Pipeline: words and idioms saved: words=${fullTranslation.words.length}');
+      }
     } catch (e, s) {
       debugPrint('Transcription pipeline failed: $e $s');
       try {
@@ -508,7 +507,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
           completedRecordingId: recordingId,
         );
         print('Pipeline: completed recordingId=$recordingId');
-        
+
         // 通知を表示（録音IDをpayloadとして含める）
         try {
           await NotificationService().showRecordingCompletedNotification(
