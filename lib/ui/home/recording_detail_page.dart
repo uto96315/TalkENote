@@ -868,9 +868,22 @@ class _TranscriptCard extends StatelessWidget {
 
   final String? text;
 
+  /// 句点で区切って改行を追加
+  String _formatTextWithLineBreaks(String text) {
+    // 句点（。）で分割して、各センテンスの後に改行を追加
+    return text
+        .split('。')
+        .where((s) => s.trim().isNotEmpty)
+        .map((s) => s.trim() + '。')
+        .join('\n');
+  }
+
   @override
   Widget build(BuildContext context) {
     final value = text?.trim() ?? '';
+    final formattedValue =
+        value.isNotEmpty ? _formatTextWithLineBreaks(value) : '';
+
     return _ModernCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -912,7 +925,7 @@ class _TranscriptCard extends StatelessWidget {
             )
           else
             SelectableText(
-              value,
+              formattedValue,
               style: const TextStyle(
                 fontSize: 15,
                 color: AppColors.textPrimary,
@@ -999,7 +1012,7 @@ class _SentencesSection extends ConsumerWidget {
   }
 }
 
-class _SentenceCard extends StatelessWidget {
+class _SentenceCard extends StatefulWidget {
   const _SentenceCard({
     required this.sentence,
     required this.onEdit,
@@ -1007,6 +1020,110 @@ class _SentenceCard extends StatelessWidget {
 
   final Sentence sentence;
   final VoidCallback onEdit;
+
+  @override
+  State<_SentenceCard> createState() => _SentenceCardState();
+}
+
+class _SentenceCardState extends State<_SentenceCard> {
+  FlutterTts? _flutterTts;
+  bool _isSpeaking = false;
+  Timer? _speakTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _initTts();
+  }
+
+  @override
+  void dispose() {
+    _speakTimer?.cancel();
+    _flutterTts?.stop();
+    _flutterTts = null;
+    super.dispose();
+  }
+
+  Future<void> _initTts() async {
+    try {
+      _flutterTts = FlutterTts();
+
+      _flutterTts?.setCompletionHandler(() {
+        _speakTimer?.cancel();
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+      });
+
+      _flutterTts?.setErrorHandler((msg) {
+        debugPrint('TTS Error: $msg');
+        _speakTimer?.cancel();
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+      });
+
+      await _flutterTts?.setLanguage('en-US');
+      await _flutterTts?.setSpeechRate(0.5);
+      await _flutterTts?.setVolume(1.0);
+      await _flutterTts?.setPitch(1.0);
+    } catch (e) {
+      debugPrint('Error initializing TTS: $e');
+    }
+  }
+
+  Future<void> _speak(String text) async {
+    if (_flutterTts == null) {
+      await _initTts();
+    }
+
+    if (_flutterTts == null) {
+      debugPrint('TTS not initialized');
+      return;
+    }
+
+    try {
+      _speakTimer?.cancel();
+
+      if (_isSpeaking) {
+        await _flutterTts?.stop();
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _isSpeaking = true;
+      });
+
+      await _flutterTts?.speak(text);
+
+      // フォールバックタイマー
+      final estimatedDuration = Duration(
+        milliseconds: text.length * 100 + 1000, // 長文対応で余裕を持たせる
+      );
+
+      _speakTimer = Timer(estimatedDuration, () {
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+      });
+    } catch (e) {
+      debugPrint('Error speaking: $e');
+      _speakTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1028,7 +1145,7 @@ class _SentenceCard extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  sentence.text,
+                  widget.sentence.text,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -1038,7 +1155,7 @@ class _SentenceCard extends StatelessWidget {
                 ),
               ),
               InkWell(
-                onTap: onEdit,
+                onTap: widget.onEdit,
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.all(4),
@@ -1051,7 +1168,7 @@ class _SentenceCard extends StatelessWidget {
               ),
             ],
           ),
-          if (sentence.en != null && sentence.en!.isNotEmpty) ...[
+          if (widget.sentence.en != null && widget.sentence.en!.isNotEmpty) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -1066,21 +1183,51 @@ class _SentenceCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    sentence.en!,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      height: 1.5,
-                    ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.sentence.en!,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                            height: 1.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      InkWell(
+                        onTap: _isSpeaking
+                            ? null
+                            : () => _speak(widget.sentence.en!),
+                        borderRadius: BorderRadius.circular(20),
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: _isSpeaking
+                                ? AppColors.primary.withOpacity(0.2)
+                                : AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Icon(
+                            Icons.volume_up,
+                            size: 18,
+                            color: _isSpeaking
+                                ? AppColors.primary
+                                : AppColors.primary.withOpacity(0.7),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
             ),
           ],
-          if (sentence.grammarPoint != null &&
-              sentence.grammarPoint!.isNotEmpty) ...[
+          if (widget.sentence.grammarPoint != null &&
+              widget.sentence.grammarPoint!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(10),
@@ -1103,7 +1250,7 @@ class _SentenceCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      sentence.grammarPoint!,
+                      widget.sentence.grammarPoint!,
                       style: TextStyle(
                         fontSize: 13,
                         color: AppColors.textPrimary,
