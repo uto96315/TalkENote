@@ -1,8 +1,10 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
 import 'dart:developer' as dev;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:talkenote/constants/app_colors.dart';
 
 import '../../data/model/recording.dart';
@@ -350,7 +352,7 @@ class _RecordingDetailPageState extends ConsumerState<RecordingDetailPage> {
               runSpacing: 10,
               children: recording.words.map((wordInfo) {
                 return ConstrainedBox(
-                  constraints:  BoxConstraints(
+                  constraints: BoxConstraints(
                     minWidth: MediaQuery.of(context).size.width,
                   ),
                   child: _WordChip(
@@ -585,7 +587,7 @@ class _InfoRow extends StatelessWidget {
 }
 
 // 単語チップ
-class _WordChip extends StatelessWidget {
+class _WordChip extends StatefulWidget {
   const _WordChip({
     required this.word,
     required this.ja,
@@ -601,6 +603,120 @@ class _WordChip extends StatelessWidget {
   final String? example;
   final String? exampleJa;
   final int? difficulty;
+
+  @override
+  State<_WordChip> createState() => _WordChipState();
+}
+
+class _WordChipState extends State<_WordChip> {
+  FlutterTts? _flutterTts;
+  bool _isSpeaking = false;
+  Timer? _speakTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _initTts();
+  }
+
+  @override
+  void dispose() {
+    _speakTimer?.cancel();
+    _flutterTts?.stop();
+    _flutterTts = null;
+    super.dispose();
+  }
+
+  Future<void> _initTts() async {
+    try {
+      _flutterTts = FlutterTts();
+
+      // 完了ハンドラーを最初に設定（これが重要）
+      _flutterTts?.setCompletionHandler(() {
+        debugPrint('TTS completion handler called');
+        _speakTimer?.cancel(); // タイマーをキャンセル
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+      });
+
+      _flutterTts?.setErrorHandler((msg) {
+        debugPrint('TTS Error: $msg');
+        if (mounted) {
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+      });
+
+      // 設定を適用
+      await _flutterTts?.setLanguage('en-US');
+      await _flutterTts?.setSpeechRate(0.5);
+      await _flutterTts?.setVolume(1.0);
+      await _flutterTts?.setPitch(1.0);
+    } catch (e) {
+      debugPrint('Error initializing TTS: $e');
+    }
+  }
+
+  Future<void> _speak() async {
+    if (_flutterTts == null) {
+      await _initTts();
+    }
+
+    if (_flutterTts == null) {
+      debugPrint('TTS not initialized');
+      return;
+    }
+
+    try {
+      // 既存のタイマーをキャンセル
+      _speakTimer?.cancel();
+
+      // 既に再生中の場合は停止
+      if (_isSpeaking) {
+        await _flutterTts?.stop();
+        // 停止してから少し待つ
+        await Future.delayed(const Duration(milliseconds: 200));
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        _isSpeaking = true;
+      });
+
+      // 読み上げを開始
+      await _flutterTts?.speak(widget.word);
+
+      // フォールバック: 完了ハンドラーが呼ばれない場合に備えて、
+      // 単語の長さに基づいて推定される時間後に状態をリセット
+      final estimatedDuration = Duration(
+        milliseconds: widget.word.length * 100 + 500, // 文字数 * 100ms + 余裕500ms
+      );
+
+      _speakTimer = Timer(estimatedDuration, () {
+        if (mounted && _isSpeaking) {
+          debugPrint('TTS fallback timer: resetting _isSpeaking');
+          setState(() {
+            _isSpeaking = false;
+          });
+        }
+      });
+
+      debugPrint('TTS speak called for: ${widget.word}');
+    } catch (e) {
+      debugPrint('Error speaking: $e');
+      _speakTimer?.cancel();
+      if (mounted) {
+        setState(() {
+          _isSpeaking = false;
+        });
+      }
+    }
+  }
 
   /// 品詞を日本語ラベルに変換
   String _getPartOfSpeechLabel(String partOfSpeech) {
@@ -651,14 +767,35 @@ class _WordChip extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                word,
+                widget.word,
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primary,
                 ),
               ),
-              if (partOfSpeech != null) ...[
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: _isSpeaking ? null : _speak,
+                borderRadius: BorderRadius.circular(20),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: _isSpeaking
+                        ? AppColors.primary.withOpacity(0.2)
+                        : AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    Icons.volume_up,
+                    size: 18,
+                    color: _isSpeaking
+                        ? AppColors.primary
+                        : AppColors.primary.withOpacity(0.7),
+                  ),
+                ),
+              ),
+              if (widget.partOfSpeech != null) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding:
@@ -668,7 +805,7 @@ class _WordChip extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    _getPartOfSpeechLabel(partOfSpeech!),
+                    _getPartOfSpeechLabel(widget.partOfSpeech!),
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -677,13 +814,13 @@ class _WordChip extends StatelessWidget {
                   ),
                 ),
               ],
-              if (difficulty != null) ...[
+              if (widget.difficulty != null) ...[
                 const SizedBox(width: 6),
                 ...List.generate(5, (index) {
                   return Icon(
                     Icons.star,
                     size: 12,
-                    color: index < difficulty!
+                    color: index < widget.difficulty!
                         ? Colors.amber
                         : Colors.grey.shade300,
                   );
@@ -693,26 +830,26 @@ class _WordChip extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            ja,
+            widget.ja,
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textPrimary,
             ),
           ),
-          if (example != null && example!.isNotEmpty) ...[
+          if (widget.example != null && widget.example!.isNotEmpty) ...[
             const SizedBox(height: 6),
             Text(
-              '"$example"',
+              '"${widget.example}"',
               style: TextStyle(
                 fontSize: 12,
                 fontStyle: FontStyle.italic,
                 color: AppColors.textSecondary,
               ),
             ),
-            if (exampleJa != null && exampleJa!.isNotEmpty) ...[
+            if (widget.exampleJa != null && widget.exampleJa!.isNotEmpty) ...[
               const SizedBox(height: 2),
               Text(
-                '"$exampleJa"',
+                '"${widget.exampleJa}"',
                 style: TextStyle(
                   fontSize: 11,
                   color: AppColors.textSecondary.withOpacity(0.8),
