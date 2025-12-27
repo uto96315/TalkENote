@@ -8,6 +8,7 @@ import '../../../provider/recording_provider.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/plan_provider.dart';
 import '../../../utils/snackbar_utils.dart';
+import '../../auth/signup_page.dart';
 import '../home_page.dart';
 import '../recording_detail_page.dart';
 
@@ -109,16 +110,22 @@ class RecordTabPage extends ConsumerWidget {
             // 月間録音回数の表示
             monthlyCountAsync.when(
               data: (count) {
-                final limit = limits.monthlyRecordingLimit;
+                final authRepo = ref.read(authRepositoryProvider);
+                final isAnonymous = authRepo.currentUser?.isAnonymous ?? false;
+                // 匿名ユーザーの場合は1回限り
+                final limit = isAnonymous ? 1 : limits.monthlyRecordingLimit;
                 final isNearLimit = count >= limit * 0.8; // 80%以上で警告
                 final isAtLimit = count >= limit;
-                if (count > 0 || isNearLimit) {
+
+                if (count > 0 || isNearLimit || isAnonymous) {
                   return Padding(
                     padding: const EdgeInsets.only(top: 8),
                     child: Column(
                       children: [
                         Text(
-                          '今月の録音: $count/$limit 回${isAtLimit ? ' (上限到達)' : isNearLimit ? ' (残り${limit - count}回)' : ''}',
+                          isAnonymous
+                              ? '録音: $count/1 回${isAtLimit ? ' (上限到達)' : ''}'
+                              : '今月の録音: $count/$limit 回${isAtLimit ? ' (上限到達)' : isNearLimit ? ' (残り${limit - count}回)' : ''}',
                           style:
                               Theme.of(context).textTheme.bodyLarge?.copyWith(
                                     color: isAtLimit
@@ -129,19 +136,33 @@ class RecordTabPage extends ConsumerWidget {
                                     fontWeight: FontWeight.w600,
                                   ),
                         ),
-                        // 上限に達した場合、プラン変更ボタンを表示
+                        // 上限に達した場合のボタン表示
                         if (isAtLimit) ...[
                           const SizedBox(height: 12),
                           ElevatedButton.icon(
                             onPressed: () {
-                              // アカウントタブに遷移
-                              ref.read(currentTabProvider.notifier).state =
-                                  HomeTab.account;
+                              if (isAnonymous) {
+                                // 匿名ユーザーの場合は登録ページに遷移
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => const SignUpPage(),
+                                  ),
+                                );
+                              } else {
+                                // 通常ユーザーの場合はアカウントタブに遷移
+                                ref.read(currentTabProvider.notifier).state =
+                                    HomeTab.account;
+                              }
                             },
-                            icon: const Icon(Icons.upgrade, size: 18),
-                            label: const Text('アップグレードして回数を増やす',
-                                style: TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.w600)),
+                            icon: Icon(
+                              isAnonymous ? Icons.person_add : Icons.upgrade,
+                              size: 18,
+                            ),
+                            label: Text(
+                              isAnonymous ? 'アカウント登録して続ける' : 'アップグレードして回数を増やす',
+                              style: const TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w600),
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.red[700],

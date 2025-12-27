@@ -127,7 +127,7 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.2),
+                              color: AppColors.textSecondary.withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: Colors.white.withValues(alpha: 0.3),
@@ -198,26 +198,27 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                           ),
                           const SizedBox(height: 24),
                         ],
-                        // プラン情報
-                        planAsync.when(
-                          data: (plan) => PlanCard(
-                            plan: plan,
-                            limits: limitsAsync,
-                            monthlyCount: monthlyCountAsync.when(
-                              data: (count) => count,
-                              loading: () => 0,
-                              error: (_, __) => 0,
+                        // プラン情報（匿名ユーザーの場合は表示しない）
+                        if (!isAnonymous)
+                          planAsync.when(
+                            data: (plan) => PlanCard(
+                              plan: plan,
+                              limits: limitsAsync,
+                              monthlyCount: monthlyCountAsync.when(
+                                data: (count) => count,
+                                loading: () => 0,
+                                error: (_, __) => 0,
+                              ),
+                            ),
+                            loading: () => const Center(
+                              child:
+                                  CircularProgressIndicator(color: Colors.white),
+                            ),
+                            error: (error, _) => Text(
+                              'エラー: $error',
+                              style: const TextStyle(color: Colors.white),
                             ),
                           ),
-                          loading: () => const Center(
-                            child:
-                                CircularProgressIndicator(color: Colors.white),
-                          ),
-                          error: (error, _) => Text(
-                            'エラー: $error',
-                            style: const TextStyle(color: Colors.white),
-                          ),
-                        ),
                       ],
                     ),
                   ),

@@ -157,12 +157,22 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
 
     // 月間録音回数をチェック
     final monthlyCount = await _userRepo.getMonthlyRecordingCount(user.uid);
-    final limits = PlanLimits.forPlan(_currentPlan ?? UserPlan.free);
-    if (monthlyCount >= limits.monthlyRecordingLimit) {
-      state = state.copyWith(
-        errorMessage:
-            '今月の録音回数上限（${limits.monthlyRecordingLimit}回）に達しています。プランをアップグレードしてください。',
-      );
+    final isAnonymous = user.isAnonymous;
+    
+    // 匿名ユーザーの場合は1回限り
+    final recordingLimit = isAnonymous ? 1 : PlanLimits.forPlan(_currentPlan ?? UserPlan.free).monthlyRecordingLimit;
+    
+    if (monthlyCount >= recordingLimit) {
+      if (isAnonymous) {
+        state = state.copyWith(
+          errorMessage: '録音は1回限りです。続けて使うにはアカウント登録が必要です。',
+        );
+      } else {
+        state = state.copyWith(
+          errorMessage:
+              '今月の録音回数上限（${recordingLimit}回）に達しています。プランをアップグレードしてください。',
+        );
+      }
       return;
     }
 
