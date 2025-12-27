@@ -64,17 +64,10 @@ class RecordTabPage extends ConsumerWidget {
       child: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 60),
-            Text(
-              isRecording ? 'レコーディング中' : 'ボタンをタップで録音開始',
-              style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white),
-            ),
             const SizedBox(height: 50),
             _RecordButton(
               isRecording: isRecording,
+              text: isRecording ? 'レコーディング中' : 'タップで録音開始',
               onTap: () => vm.toggleRecording(),
             ),
             const SizedBox(height: 24),
@@ -146,7 +139,9 @@ class RecordTabPage extends ConsumerWidget {
                                   HomeTab.account;
                             },
                             icon: const Icon(Icons.upgrade, size: 18),
-                            label: const Text('アップグレードして回数を増やす', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+                            label: const Text('アップグレードして回数を増やす',
+                                style: TextStyle(
+                                    fontSize: 15, fontWeight: FontWeight.w600)),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: Colors.red[700],
@@ -338,10 +333,12 @@ class _RecordButton extends StatefulWidget {
   const _RecordButton({
     required this.isRecording,
     required this.onTap,
+    required this.text,
   });
 
   final bool isRecording;
   final VoidCallback onTap;
+  final String text;
 
   @override
   State<_RecordButton> createState() => _RecordButtonState();
@@ -449,10 +446,23 @@ class _RecordButtonState extends State<_RecordButton>
               ],
             ),
             child: Center(
-              child: Icon(
-                widget.isRecording ? Icons.stop_rounded : Icons.mic_rounded,
-                size: 48,
-                color: widget.isRecording ? baseColor : Colors.white,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    widget.isRecording ? Icons.stop_rounded : Icons.mic_rounded,
+                    size: 48,
+                    color: widget.isRecording ? baseColor : Colors.white,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    widget.text,
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withValues(alpha: 0.8)),
+                  ),
+                ],
               ),
             ),
           ),
