@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:talkenote/constants/app_colors.dart';
 import '../../../data/model/recording.dart';
 import '../../../provider/auth_provider.dart';
+import '../../../provider/plan_provider.dart';
 import '../../../provider/recording_provider.dart';
+import '../../../service/ad_service.dart';
 import '../recording_detail_page.dart';
 
 class RecordingsList extends ConsumerStatefulWidget {
@@ -113,10 +115,45 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
               ),
             if (_items.isNotEmpty)
               Expanded(
-                child: ListView.builder(
-                  itemCount: _items.length,
-                  itemBuilder: (_, i) {
-                    final rec = _items[i];
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final shouldShowAds = ref.watch(shouldShowAdsProvider);
+                    // 広告の位置も含めてカウント（有料ユーザーの場合も広告の位置はカウントするが、広告は表示しない）
+                    final adCount = (_items.length / 3).ceil();
+                    final totalItemCount = _items.length + adCount;
+                    
+                    return ListView.builder(
+                      itemCount: totalItemCount,
+                      itemBuilder: (_, i) {
+                        // 3つに1つ広告を挿入（インデックス3, 7, 11...の位置に広告）
+                        // パターン: アイテム0, 1, 2, 広告, アイテム3, 4, 5, 広告, ...
+                        final positionInGroup = i % 4;
+                        
+                        if (positionInGroup == 3) {
+                          // 広告を表示（無課金ユーザーのみ）
+                          if (shouldShowAds) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: AdBanner(
+                                adUnitId: AdService.getBannerAdUnitId(),
+                                width: double.infinity,
+                                height: 50,
+                              ),
+                            );
+                          }
+                          // 有料ユーザーの場合は広告の代わりに空のスペースを返す
+                          return const SizedBox.shrink();
+                        }
+                    
+                    // 通常のアイテムを表示
+                    final groupIndex = i ~/ 4;
+                    final itemIndex = groupIndex * 3 + positionInGroup;
+                    
+                    if (itemIndex >= _items.length) {
+                      return const SizedBox.shrink();
+                    }
+                    
+                    final rec = _items[itemIndex];
                     final created = rec.createdAt?.toDate();
                     final dateLabel = created != null
                         ? '${created.year}/${created.month.toString().padLeft(2, '0')}/${created.day.toString().padLeft(2, '0')} ${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}'
@@ -136,6 +173,8 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
                         },
                       ),
                     );
+                      },
+                    );
                   },
                 ),
               ),
@@ -145,20 +184,4 @@ class _RecordingsListState extends ConsumerState<RecordingsList> {
     );
   }
 
-  Widget _list(Recording rec, String dateLabel) {
-    return Card(
-      child: ListTile(
-        title: Text(rec.title ?? '(タイトルなし)'),
-        subtitle: Text(dateLabel),
-        onTap: () async {
-          await Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => RecordingDetailPage(recording: rec),
-            ),
-          );
-          await _load();
-        },
-      ),
-    );
-  }
 }

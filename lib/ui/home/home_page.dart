@@ -4,7 +4,9 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../constants/home_tab.dart';
 import '../../provider/home_provider.dart';
+import '../../provider/plan_provider.dart';
 import '../../provider/recording_provider.dart';
+import '../../provider/ad_provider.dart';
 import 'pages/account_tab_page.dart';
 import 'pages/home_tab_page.dart';
 import 'pages/note_tab_page.dart';
@@ -22,6 +24,23 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   final _tabSoundPlayer = AudioPlayer();
+
+  @override
+  void initState() {
+    super.initState();
+    // ホーム画面表示時に広告を事前読み込み（無課金ユーザーのみ）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _preloadAdsIfNeeded();
+    });
+  }
+
+  void _preloadAdsIfNeeded() {
+    final shouldShowAds = ref.read(shouldShowAdsProvider);
+    if (shouldShowAds) {
+      final adService = ref.read(adServiceProvider);
+      adService.preloadInterstitialAd();
+    }
+  }
 
   @override
   void dispose() {

@@ -24,6 +24,7 @@ import '../provider/auth_provider.dart';
 import '../provider/plan_provider.dart';
 import '../provider/recording_provider.dart';
 import '../provider/user_provider.dart';
+import '../provider/ad_provider.dart';
 import '../constants/upload_status.dart';
 import '../data/model/sentence.dart';
 
@@ -175,6 +176,20 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
     );
     _scheduleAutoStop();
     _startElapsedTicker();
+    
+    // 録音中に広告を事前に読み込んでおく（無課金ユーザーのみ）
+    try {
+      final limits = PlanLimits.forPlan(_currentPlan ?? UserPlan.free);
+      if (limits.showAds) {
+        final adService = ref.read(adServiceProvider);
+        // 広告が準備できていない場合は読み込む
+        if (!adService.isInterstitialAdReady) {
+          adService.preloadInterstitialAd();
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to preload interstitial ad: $e');
+    }
   }
 
   Future<void> _stopRecording() async {
@@ -507,6 +522,25 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
           completedRecordingId: recordingId,
         );
         print('Pipeline: completed recordingId=$recordingId');
+
+        // インタースティシャル広告を表示（無課金ユーザーのみ）
+        try {
+          // プランが読み込まれていない場合は読み込む
+          if (_currentPlan == null) {
+            await _loadUserPlan();
+          }
+          final limits = PlanLimits.forPlan(_currentPlan ?? UserPlan.free);
+          debugPrint('Plan: ${_currentPlan ?? UserPlan.free}, showAds: ${limits.showAds}');
+          if (limits.showAds) {
+            final adService = ref.read(adServiceProvider);
+            final shown = await adService.showInterstitialAd();
+            debugPrint('Interstitial ad show result: $shown');
+          } else {
+            debugPrint('Skipping ad display (user is not on free plan)');
+          }
+        } catch (e) {
+          debugPrint('Failed to show interstitial ad: $e');
+        }
 
         // 通知を表示（録音IDをpayloadとして含める）
         try {

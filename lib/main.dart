@@ -6,6 +6,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'app/app.dart';
 import 'firebase_options.dart';
 import 'service/notification_service.dart';
+import 'service/ad_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -35,6 +36,14 @@ void main() async {
   } catch (e) {
     debugPrint('Error initializing notification service: $e');
     // Continue app initialization even if notification service fails
+  }
+
+  // AdMobを初期化
+  try {
+    await AdService().initialize();
+  } catch (e) {
+    debugPrint('Error initializing AdMob: $e');
+    // Continue app initialization even if AdMob fails
   }
 
   runApp(
