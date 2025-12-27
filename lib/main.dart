@@ -10,7 +10,7 @@ import 'service/ad_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await dotenv.load(fileName: '.env');
   } catch (e) {
