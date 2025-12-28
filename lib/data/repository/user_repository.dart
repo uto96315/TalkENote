@@ -223,4 +223,41 @@ class UserRepository {
     final now = DateTime.now();
     return '${now.year}-${now.month.toString().padLeft(2, '0')}';
   }
+
+  /// 利用規約への同意状態を更新
+  Future<void> updateTermsAgreement({
+    required String uid,
+    required bool agreedToTerms,
+    required bool agreedToPrivacy,
+    required DateTime agreedAt,
+  }) async {
+    try {
+      await userRef(uid).update({
+        'agreedToTerms': agreedToTerms,
+        'agreedToPrivacy': agreedToPrivacy,
+        'agreedAt': FieldValue.serverTimestamp(),
+        'agreedAtLocal': agreedAt.toIso8601String(),
+      });
+    } catch (e) {
+      debugPrint("🚨Error updating terms agreement: $e");
+      rethrow;
+    }
+  }
+
+  /// 利用規約への同意状態を取得
+  Future<bool> hasAgreedToTerms(String uid) async {
+    try {
+      final snapshot = await userRef(uid).get();
+      if (!snapshot.exists) {
+        return false;
+      }
+      final data = snapshot.data();
+      final agreedToTerms = data?['agreedToTerms'] as bool?;
+      final agreedToPrivacy = data?['agreedToPrivacy'] as bool?;
+      return (agreedToTerms ?? false) && (agreedToPrivacy ?? false);
+    } catch (e) {
+      debugPrint("🚨Error getting terms agreement: $e");
+      return false;
+    }
+  }
 }
