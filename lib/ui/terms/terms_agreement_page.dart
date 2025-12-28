@@ -39,7 +39,6 @@ class _TermsAgreementPageState extends ConsumerState<TermsAgreementPage> {
           uid: user.uid,
           agreedToTerms: true,
           agreedToPrivacy: true,
-          agreedAt: DateTime.now(),
         );
       }
 

@@ -826,6 +826,9 @@ class _WordChipState extends State<_WordChip> {
                   );
                 }),
               ],
+              const Spacer(),
+              // ブックマークされていれば色を変更
+              Icon(Icons.bookmark, size: 18, color: AppColors.textSecondary),
             ],
           ),
           const SizedBox(height: 4),

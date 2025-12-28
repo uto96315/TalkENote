@@ -229,14 +229,12 @@ class UserRepository {
     required String uid,
     required bool agreedToTerms,
     required bool agreedToPrivacy,
-    required DateTime agreedAt,
   }) async {
     try {
       await userRef(uid).update({
         'agreedToTerms': agreedToTerms,
         'agreedToPrivacy': agreedToPrivacy,
         'agreedAt': FieldValue.serverTimestamp(),
-        'agreedAtLocal': agreedAt.toIso8601String(),
       });
     } catch (e) {
       debugPrint("🚨Error updating terms agreement: $e");
