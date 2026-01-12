@@ -82,7 +82,7 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
     final userRepo = ref.read(userRepositoryProvider);
     final currentUser = authRepo.currentUser;
     final isAnonymous = currentUser?.isAnonymous ?? false;
-    
+
     // メールアドレスを取得（非同期）
     final emailFuture = currentUser != null
         ? userRepo.getUserEmail(currentUser.uid)
@@ -129,7 +129,8 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                           Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: AppColors.textSecondary.withValues(alpha: 0.2),
+                              color: AppColors.textSecondary
+                                  .withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: Colors.white.withValues(alpha: 0.3),
@@ -213,8 +214,8 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                               ),
                             ),
                             loading: () => const Center(
-                              child:
-                                  CircularProgressIndicator(color: Colors.white),
+                              child: CircularProgressIndicator(
+                                  color: Colors.white),
                             ),
                             error: (error, _) => Text(
                               'エラー: $error',
@@ -273,11 +274,11 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                       cancelText: 'キャンセル',
                       isDestructive: true,
                     );
-                    
+
                     if (confirmed != true) {
                       return; // キャンセルされた場合は処理を中断
                     }
-                    
+
                     final authRepo = ref.read(authRepositoryProvider);
                     final userRepo = ref.read(userRepositoryProvider);
                     try {
@@ -291,17 +292,18 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                           isAnonymous: true,
                         );
                       }
-                      
+
                       if (mounted) {
                         // タブをホームにリセット
-                        ref.read(currentTabProvider.notifier).state = HomeTab.home;
-                        
+                        ref.read(currentTabProvider.notifier).state =
+                            HomeTab.home;
+
                         // ナビゲーションスタックをクリアしてホーム画面に戻る
                         Navigator.of(context).pushNamedAndRemoveUntil(
                           AppRoutes.home,
                           (route) => false, // すべてのルートを削除
                         );
-                        
+
                         // 少し遅延してからスナックバーを表示（ナビゲーション完了後）
                         Future.delayed(const Duration(milliseconds: 300), () {
                           if (mounted) {
@@ -311,8 +313,7 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                       }
                     } catch (e) {
                       if (mounted) {
-                        SnackBarUtils.show(
-                            context, 'ログアウトに失敗しました: $e');
+                        SnackBarUtils.show(context, 'ログアウトに失敗しました: $e');
                       }
                     }
                   },
@@ -486,29 +487,35 @@ class _StatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 20,
-            ),
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.8),
+                    fontWeight: FontWeight.w500,
+                    height: 1.3,
+                  ),
+                ),
+              ),
+            ],
           ),
           const Spacer(),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: Colors.white.withValues(alpha: 0.8),
-              fontWeight: FontWeight.w500,
-              height: 1.3,
-            ),
-          ),
-          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
@@ -524,4 +531,3 @@ class _StatCard extends StatelessWidget {
     );
   }
 }
-
