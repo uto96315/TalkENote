@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../constants/recording_fields.dart';
@@ -38,6 +39,20 @@ class RecordingRepository {
         .orderBy(RecordingFields.createdAt, descending: true)
         .get();
     return snap.docs.map(Recording.fromDoc).toList();
+  }
+
+  /// ユーザーの記録回数を取得
+  Future<int> getRecordingCount(String userId) async {
+    try {
+      final snap = await _collection
+          .where(RecordingFields.userId, isEqualTo: userId)
+          .count()
+          .get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint("🚨Error getting recording count: $e");
+      return 0;
+    }
   }
 
   Future<Recording?> fetchRecordingById(String recordingId) async {

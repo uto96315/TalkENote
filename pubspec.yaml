@@ -30,6 +30,7 @@ dependencies:
   flutter_local_notifications: ^17.2.3
   flutter_tts: ^4.1.0
   google_mobile_ads: ^5.1.0
+  rive: ^0.13.0
 
 dependency_overrides:
   record_linux: ^1.0.0

@@ -170,7 +170,7 @@ class HomeViewModel extends AutoDisposeNotifier<HomeState> {
       } else {
         state = state.copyWith(
           errorMessage:
-              '今月の録音回数上限（${recordingLimit}回）に達しています。プランをアップグレードしてください。',
+              '今月の録音回数上限（$recordingLimit回）に達しています。プランをアップグレードしてください。',
         );
       }
       return;

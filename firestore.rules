@@ -31,6 +31,14 @@ service cloud.firestore {
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
     
+    // ブックマーク
+    match /users/{userId}/bookmarks/{wordId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+    
     // お問い合わせ
     match /inquiries/{inquiryId} {
       allow read: if request.auth != null && 

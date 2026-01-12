@@ -4,6 +4,8 @@ import '../../../constants/app_colors.dart';
 import '../../../constants/home_tab.dart';
 import '../../../provider/auth_provider.dart';
 import '../../../provider/plan_provider.dart';
+import '../../../provider/statistics_provider.dart'
+    show statisticsProvider, StatisticsData;
 import '../../../provider/user_provider.dart';
 import '../../../utils/snackbar_utils.dart';
 import '../../auth/signin_page.dart';
@@ -199,7 +201,7 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                           const SizedBox(height: 24),
                         ],
                         // プラン情報（匿名ユーザーの場合は表示しない）
-                        if (!isAnonymous)
+                        if (!isAnonymous) ...[
                           planAsync.when(
                             data: (plan) => PlanCard(
                               plan: plan,
@@ -219,6 +221,10 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                               style: const TextStyle(color: Colors.white),
                             ),
                           ),
+                          const SizedBox(height: 24),
+                        ],
+                        // 統計情報
+                        const _StatisticsSection(),
                       ],
                     ),
                   ),
@@ -320,6 +326,197 @@ class _AccountTabPageState extends ConsumerState<AccountTabPage>
                   },
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 統計情報セクション
+class _StatisticsSection extends ConsumerWidget {
+  const _StatisticsSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final statisticsAsync = ref.watch(statisticsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.textSecondary.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.bar_chart_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                '統計情報',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          statisticsAsync.when(
+            data: (statistics) => _buildStatisticsGrid(context, statistics),
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(20.0),
+                child: CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              ),
+            ),
+            error: (_, __) => const Text(
+              '統計情報の読み込みに失敗しました',
+              style: TextStyle(
+                fontSize: 14,
+                color: Colors.white70,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatisticsGrid(BuildContext context, StatisticsData statistics) {
+    return Column(
+      children: [
+        IntrinsicHeight(
+          child: Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.mic_rounded,
+                  label: '記録回数',
+                  value: statistics.recordingCount.toString(),
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.bookmark_rounded,
+                  label: 'ブックマーク\n単語数',
+                  value: statistics.bookmarkedWordsCount.toString(),
+                  color: Colors.blue,
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        IntrinsicHeight(
+          child: Row(
+            children: [
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.text_snippet_rounded,
+                  label: 'ブックマーク\n文章数',
+                  value: '準備中',
+                  color: Colors.orange,
+                  isComingSoon: true,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _StatCard(
+                  icon: Icons.auto_stories_rounded,
+                  label: 'ブックマーク\n熟語数',
+                  value: statistics.bookmarkedIdiomsCount.toString(),
+                  color: Colors.purple,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 統計情報カード
+class _StatCard extends StatelessWidget {
+  const _StatCard({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.isComingSoon = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final bool isComingSoon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 120,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.2),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: Colors.white,
+              size: 20,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.white.withValues(alpha: 0.8),
+              fontWeight: FontWeight.w500,
+              height: 1.3,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: isComingSoon
+                  ? Colors.white.withValues(alpha: 0.6)
+                  : Colors.white,
             ),
           ),
         ],

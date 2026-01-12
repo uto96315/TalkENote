@@ -258,4 +258,121 @@ class UserRepository {
       return false;
     }
   }
+
+  /// ブックマークコレクションの参照を取得
+  CollectionReference<Map<String, dynamic>> bookmarksRef(String uid) {
+    return userRef(uid).collection('bookmarks');
+  }
+
+  /// 単語IDを生成（word + ja の組み合わせで一意性を保つ）
+  String _generateWordId(String word, String ja) {
+    // word + ja の組み合わせをハッシュ化して一意のIDを生成
+    // FirestoreのドキュメントIDとして使用可能な文字列（a-zA-Z0-9_- のみ）
+    final combined = '$word|$ja';
+    // ハッシュコードを使用して文字列に変換
+    final hashCode = combined.hashCode;
+    // 負の数の場合も考慮して絶対値を取り、36進数に変換
+    return hashCode.abs().toRadixString(36);
+  }
+
+  /// 単語をブックマークする
+  Future<void> bookmarkWord({
+    required String uid,
+    required String word,
+    required String ja,
+    String? partOfSpeech,
+    String? example,
+    String? exampleJa,
+    int? difficulty,
+  }) async {
+    try {
+      final wordId = _generateWordId(word, ja);
+      await bookmarksRef(uid).doc(wordId).set({
+        'word': word,
+        'ja': ja,
+        if (partOfSpeech != null) 'partOfSpeech': partOfSpeech,
+        if (example != null) 'example': example,
+        if (exampleJa != null) 'exampleJa': exampleJa,
+        if (difficulty != null) 'difficulty': difficulty,
+        'bookmarkedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint("🚨Error bookmarking word: $e");
+      rethrow;
+    }
+  }
+
+  /// 単語のブックマークを解除する
+  Future<void> unbookmarkWord({
+    required String uid,
+    required String word,
+    required String ja,
+  }) async {
+    try {
+      final wordId = _generateWordId(word, ja);
+      await bookmarksRef(uid).doc(wordId).delete();
+    } catch (e) {
+      debugPrint("🚨Error unbookmarking word: $e");
+      rethrow;
+    }
+  }
+
+  /// 単語がブックマークされているか確認
+  Future<bool> isWordBookmarked({
+    required String uid,
+    required String word,
+    required String ja,
+  }) async {
+    try {
+      final wordId = _generateWordId(word, ja);
+      final doc = await bookmarksRef(uid).doc(wordId).get();
+      return doc.exists;
+    } catch (e) {
+      debugPrint("🚨Error checking if word is bookmarked: $e");
+      return false;
+    }
+  }
+
+  /// ブックマークした単語一覧を取得
+  Future<List<Map<String, dynamic>>> getBookmarkedWords(String uid) async {
+    try {
+      final snap = await bookmarksRef(uid)
+          .orderBy('bookmarkedAt', descending: true)
+          .get();
+      return snap.docs.map((doc) => {
+        'id': doc.id,
+        ...doc.data(),
+      }).toList();
+    } catch (e) {
+      debugPrint("🚨Error getting bookmarked words: $e");
+      return [];
+    }
+  }
+
+  /// ブックマークした単語数を取得
+  Future<int> getBookmarkedWordsCount(String uid) async {
+    try {
+      final snap = await bookmarksRef(uid).count().get();
+      return snap.count ?? 0;
+    } catch (e) {
+      debugPrint("🚨Error getting bookmarked words count: $e");
+      return 0;
+    }
+  }
+
+  /// ブックマークした熟語数を取得（partOfSpeech が "idiom" または "phrase" のもの）
+  Future<int> getBookmarkedIdiomsCount(String uid) async {
+    try {
+      final words = await getBookmarkedWords(uid);
+      return words.where((word) {
+        final partOfSpeech = word['partOfSpeech'] as String?;
+        return partOfSpeech != null &&
+            (partOfSpeech.toLowerCase() == 'idiom' ||
+                partOfSpeech.toLowerCase() == 'phrase');
+      }).length;
+    } catch (e) {
+      debugPrint("🚨Error getting bookmarked idioms count: $e");
+      return 0;
+    }
+  }
 }

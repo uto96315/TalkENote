@@ -10,6 +10,9 @@ import 'package:talkenote/constants/app_colors.dart';
 import '../../data/model/recording.dart';
 import '../../data/model/sentence.dart';
 import '../../provider/recording_provider.dart';
+import '../../provider/bookmark_provider.dart';
+import '../../provider/auth_provider.dart';
+import '../../provider/user_provider.dart';
 import '../../utils/snackbar_utils.dart';
 
 class RecordingDetailPage extends ConsumerStatefulWidget {
@@ -827,8 +830,14 @@ class _WordChipState extends State<_WordChip> {
                 }),
               ],
               const Spacer(),
-              // ブックマークされていれば色を変更
-              Icon(Icons.bookmark, size: 18, color: AppColors.textSecondary),
+              _BookmarkButton(
+                word: widget.word,
+                ja: widget.ja,
+                partOfSpeech: widget.partOfSpeech,
+                example: widget.example,
+                exampleJa: widget.exampleJa,
+                difficulty: widget.difficulty,
+              ),
             ],
           ),
           const SizedBox(height: 4),
@@ -866,6 +875,92 @@ class _WordChipState extends State<_WordChip> {
   }
 }
 
+/// ブックマークボタンウィジェット
+class _BookmarkButton extends ConsumerWidget {
+  const _BookmarkButton({
+    required this.word,
+    required this.ja,
+    this.partOfSpeech,
+    this.example,
+    this.exampleJa,
+    this.difficulty,
+  });
+
+  final String word;
+  final String ja;
+  final String? partOfSpeech;
+  final String? example;
+  final String? exampleJa;
+  final int? difficulty;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final bookmarkKey = WordBookmarkKey(word: word, ja: ja);
+    final isBookmarkedAsync = ref.watch(
+      isWordBookmarkedProvider(bookmarkKey),
+    );
+
+    return isBookmarkedAsync.when(
+      data: (isBookmarked) {
+        return InkWell(
+          onTap: () async {
+            final authRepo = ref.read(authRepositoryProvider);
+            final userRepo = ref.read(userRepositoryProvider);
+            final user = authRepo.currentUser;
+
+            if (user == null) {
+              SnackBarUtils.show(context, 'ログインが必要です');
+              return;
+            }
+
+            try {
+              if (isBookmarked) {
+                await userRepo.unbookmarkWord(
+                  uid: user.uid,
+                  word: word,
+                  ja: ja,
+                );
+                SnackBarUtils.show(context, 'ブックマークを解除しました');
+              } else {
+                await userRepo.bookmarkWord(
+                  uid: user.uid,
+                  word: word,
+                  ja: ja,
+                  partOfSpeech: partOfSpeech,
+                  example: example,
+                  exampleJa: exampleJa,
+                  difficulty: difficulty,
+                );
+                SnackBarUtils.show(context, 'ブックマークしました');
+              }
+              // 状態を更新
+              ref.invalidate(isWordBookmarkedProvider(bookmarkKey));
+            } catch (e) {
+              SnackBarUtils.show(context, 'エラーが発生しました: $e');
+            }
+          },
+          borderRadius: BorderRadius.circular(20),
+          child: Icon(
+            isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+            size: 30,
+            color: isBookmarked ? AppColors.primary : AppColors.textSecondary,
+          ),
+        );
+      },
+      loading: () => Icon(
+        Icons.bookmark_border,
+        size: 18,
+        color: AppColors.textSecondary,
+      ),
+      error: (_, __) => Icon(
+        Icons.bookmark_border,
+        size: 18,
+        color: AppColors.textSecondary,
+      ),
+    );
+  }
+}
+
 class _TranscriptCard extends StatelessWidget {
   const _TranscriptCard({required this.text});
 
@@ -877,7 +972,7 @@ class _TranscriptCard extends StatelessWidget {
     return text
         .split('。')
         .where((s) => s.trim().isNotEmpty)
-        .map((s) => s.trim() + '。')
+        .map((s) => '${s.trim()}。')
         .join('\n');
   }
 
